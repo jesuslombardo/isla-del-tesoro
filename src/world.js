@@ -170,40 +170,123 @@ export class World {
     const g = new THREE.Group();
     const wood = new THREE.MeshStandardMaterial({ color: 0x6b4a2b, roughness: 0.9 });
     const woodDark = new THREE.MeshStandardMaterial({ color: 0x4e3620, roughness: 0.9 });
+    const pinkSail = new THREE.MeshStandardMaterial({ color: 0xe86ba8, roughness: 1, side: THREE.DoubleSide });
 
-    const hull = new THREE.Mesh(new THREE.CapsuleGeometry(3.2, 12, 6, 12), wood);
+    // Casco grande + proa en punta
+    const hull = new THREE.Mesh(new THREE.CapsuleGeometry(3.4, 13, 6, 14), wood);
     hull.rotation.z = Math.PI / 2;
-    hull.rotation.y = 0.5;
-    hull.scale.set(1, 1, 0.6);
-    hull.position.y = 1.4;
+    hull.scale.set(1, 1, 0.62);
+    hull.position.y = 1.7;
     g.add(hull);
-
-    const deck = new THREE.Mesh(new THREE.BoxGeometry(15, 0.6, 5), woodDark);
-    deck.position.y = 2.4;
-    deck.rotation.y = 0.5;
+    const bow = new THREE.Mesh(new THREE.ConeGeometry(2.2, 5, 10), wood);
+    bow.rotation.z = -Math.PI / 2;
+    bow.scale.set(1, 1, 0.62);
+    bow.position.set(9, 1.7, 0);
+    g.add(bow);
+    const deck = new THREE.Mesh(new THREE.BoxGeometry(17, 0.6, 5.4), woodDark);
+    deck.position.y = 2.9;
     g.add(deck);
 
-    const mast = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.45, 12, 8), woodDark);
-    mast.position.set(1, 6.5, 0);
-    mast.rotation.z = 0.45;
-    g.add(mast);
+    // Dos mástiles con velas rosas
+    for (const mx of [4, -3.5]) {
+      const mast = new THREE.Mesh(new THREE.CylinderGeometry(0.32, 0.42, 13, 8), woodDark);
+      mast.position.set(mx, 8.5, 0);
+      g.add(mast);
+      const yard = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.14, 7, 6), woodDark);
+      yard.rotation.x = Math.PI / 2;
+      yard.position.set(mx, 12, 0);
+      g.add(yard);
+      const sail = new THREE.Mesh(new THREE.PlaneGeometry(6.4, 5.2), pinkSail);
+      sail.rotation.y = Math.PI / 2;
+      sail.position.set(mx, 9.2, 0);
+      g.add(sail);
+    }
 
-    const sail = new THREE.Mesh(
-      new THREE.PlaneGeometry(6, 5),
-      new THREE.MeshStandardMaterial({ color: 0xe8e2d0, roughness: 1, side: THREE.DoubleSide })
-    );
-    sail.position.set(-1.4, 8, 0.1);
-    sail.rotation.z = 0.45;
-    g.add(sail);
+    // Bandera pirata (calavera) en el mástil principal
+    const flagPole = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, 2, 6), woodDark);
+    flagPole.position.set(4, 15.5, 0);
+    g.add(flagPole);
+    const flag = new THREE.Mesh(new THREE.PlaneGeometry(1.8, 1.3), new THREE.MeshStandardMaterial({ color: 0x1a1a1a, side: THREE.DoubleSide }));
+    flag.position.set(4.95, 15.6, 0);
+    g.add(flag);
+    const boneMat = new THREE.MeshStandardMaterial({ color: 0xf0efe6 });
+    const skull = new THREE.Mesh(new THREE.SphereGeometry(0.3, 10, 8), boneMat);
+    skull.position.set(4.95, 15.85, 0.06);
+    g.add(skull);
+    for (const rot of [0.7, -0.7]) {
+      const boneX = new THREE.Mesh(new THREE.BoxGeometry(1.0, 0.12, 0.06), boneMat);
+      boneX.position.set(4.95, 15.35, 0.06);
+      boneX.rotation.z = rot;
+      g.add(boneX);
+    }
 
     g.traverse((o) => { o.castShadow = true; o.receiveShadow = true; });
 
     const wz = SPAWN.z + 8;
     const y = terrainHeightAt(SPAWN.x, wz);
-    g.position.set(SPAWN.x, y - 0.5, wz);
-    g.rotation.y = -0.6;
+    g.position.set(SPAWN.x, y - 0.6, wz);
+    g.rotation.y = -0.7;
+    g.rotation.z = 0.1; // escorado (encallado)
     this.scene.add(g);
-    this.colliders.push({ x: SPAWN.x, z: wz, r: 5.5 });
+    this.colliders.push({ x: SPAWN.x, z: wz, r: 5.8 });
+
+    // Botín a la vista en la arena seca: cofre de oro abierto + comida (barriles y frutas)
+    this._buildOpenGoldChest(SPAWN.x - 6, SPAWN.z - 2);
+    this._buildBarrel(SPAWN.x + 5, SPAWN.z - 1);
+    this._buildBarrel(SPAWN.x + 6.6, SPAWN.z + 0.8);
+  }
+
+  _buildOpenGoldChest(x, z) {
+    const ground = terrainHeightAt(x, z);
+    const g = new THREE.Group();
+    const wood = new THREE.MeshStandardMaterial({ color: 0x7a4a22, roughness: 0.8 });
+    const gold = new THREE.MeshStandardMaterial({ color: 0xf4c95d, metalness: 0.7, roughness: 0.3 });
+    const box = new THREE.Mesh(new THREE.BoxGeometry(2, 1.2, 1.4), wood);
+    box.position.y = 0.6;
+    g.add(box);
+    const lid = new THREE.Mesh(new THREE.BoxGeometry(2, 0.6, 1.4), wood);
+    lid.position.set(0, 1.5, -0.7);
+    lid.rotation.x = -1.9; // tapa abierta
+    g.add(lid);
+    // oro desbordando
+    for (let i = 0; i < 5; i++) {
+      const coin = new THREE.Mesh(new THREE.SphereGeometry(0.28, 8, 6), gold);
+      coin.position.set((i - 2) * 0.35, 1.15 + (i % 2) * 0.12, 0.1 + (i % 3) * 0.15);
+      g.add(coin);
+    }
+    g.traverse((o) => { o.castShadow = true; o.receiveShadow = true; });
+    g.position.set(x, ground, z);
+    g.rotation.y = 0.4;
+    this.scene.add(g);
+    this.colliders.push({ x, z, r: 1.3 });
+  }
+
+  _buildBarrel(x, z) {
+    const ground = terrainHeightAt(x, z);
+    const g = new THREE.Group();
+    const barrel = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.7, 0.7, 1.4, 12),
+      new THREE.MeshStandardMaterial({ color: 0x8a5a2c, roughness: 0.9 })
+    );
+    barrel.position.y = 0.7;
+    g.add(barrel);
+    for (const yy of [0.35, 1.05]) {
+      const band = new THREE.Mesh(new THREE.TorusGeometry(0.72, 0.06, 6, 14), new THREE.MeshStandardMaterial({ color: 0x3a2a18 }));
+      band.rotation.x = Math.PI / 2;
+      band.position.y = yy;
+      g.add(band);
+    }
+    // frutas arriba
+    const fruitColors = [0xd83b34, 0xe8a020, 0xd83b34];
+    for (let i = 0; i < 3; i++) {
+      const fruit = new THREE.Mesh(new THREE.SphereGeometry(0.22, 8, 8), new THREE.MeshStandardMaterial({ color: fruitColors[i], roughness: 0.6 }));
+      fruit.position.set((i - 1) * 0.3, 1.5, (i % 2) * 0.2);
+      g.add(fruit);
+    }
+    g.traverse((o) => { o.castShadow = true; o.receiveShadow = true; });
+    g.position.set(x, ground, z);
+    this.scene.add(g);
+    this.colliders.push({ x, z, r: 0.8 });
   }
 
   // ------------------------------------------------------------------- cueva
