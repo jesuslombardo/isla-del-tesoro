@@ -128,6 +128,22 @@ export class GameAudio {
     });
   }
 
+  // Juntar moneda/estrella: dos notas brillantes que suben.
+  coin(star = false) {
+    if (!this.ctx || this.muted) return;
+    const t = this.ctx.currentTime;
+    const notes = star ? [880, 1320, 1760] : [1046, 1568];
+    notes.forEach((f, i) => {
+      const st = t + i * 0.06;
+      const o = this.ctx.createOscillator(); o.type = 'triangle'; o.frequency.value = f;
+      const g = this.ctx.createGain();
+      g.gain.setValueAtTime(0.0001, st);
+      g.gain.exponentialRampToValueAtTime(0.12, st + 0.01);
+      g.gain.exponentialRampToValueAtTime(0.0001, st + 0.18);
+      o.connect(g); g.connect(this.master); o.start(st); o.stop(st + 0.2);
+    });
+  }
+
   setMuted(m) {
     this.muted = m;
     if (this.master) this.master.gain.value = m ? 0 : 0.9;

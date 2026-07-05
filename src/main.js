@@ -95,6 +95,7 @@ function submitRiddle(pista, idx) {
   // Recompensa: diamantes + una estrella por pista resuelta
   state.diamonds += 30;
   state.stars += 1;
+  updateWealth();
   hud.toast('🏆 +30 💎  +1 ⭐');
   setTimeout(() => onPistaSolved(pista, idx), 900);
 }
@@ -160,6 +161,7 @@ function startGame() {
   hud.showHUD();
   document.querySelectorAll('.hud-btn').forEach((b) => b.classList.remove('hidden'));
   hud.setLives(state.lives);
+  updateWealth();
   hud.setObjective('Explorá la isla y encontrá la cueva (seguí el haz de luz).');
   hud.el.intro.classList.add('hidden');
   player.enabled = true;
@@ -340,6 +342,27 @@ function updateInteraction() {
   }
 }
 
+function updateWealth() {
+  document.getElementById('wealth').textContent = `💎 ${state.diamonds}   ⭐ ${state.stars}`;
+}
+
+// Juntar monedas y estrellas al caminarles encima
+function checkCollectibles() {
+  if (!world.collectibles) return;
+  const p = player.object.position;
+  for (const c of world.collectibles) {
+    if (c.taken) continue;
+    if (Math.hypot(p.x - c.x, p.z - c.z) < 1.7) {
+      c.taken = true;
+      c.group.visible = false;
+      if (c.type === 'coin') { state.diamonds += c.value; audio.coin(false); }
+      else { state.stars += c.value; audio.coin(true); }
+      updateWealth();
+      hud.toast(c.type === 'coin' ? `💎 +${c.value}` : '⭐ +1  ¡Estrella!', 1200);
+    }
+  }
+}
+
 // Último punto seguro (para respawnear tras un peligro)
 function updateSafePos() {
   const p = player.object.position;
@@ -362,6 +385,7 @@ function animate() {
   if (state.started && !state.modalOpen && !state.won && !state.over) {
     player.update(dt, { onDanger });
     updateSafePos();
+    checkCollectibles();
     // Pasos: un sonido cada cierta distancia recorrida
     const p = player.object.position;
     const moved = Math.hypot(p.x - lastStepX, p.z - lastStepZ);
@@ -383,4 +407,5 @@ window.__isla = {
     const it = world.interactables.find((i) => i.id === id);
     if (it) handleInteract(it);
   },
+  checkCollectibles,
 };

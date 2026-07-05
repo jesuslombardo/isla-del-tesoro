@@ -61,6 +61,13 @@ html, body {
   filter: drop-shadow(0 2px 3px rgba(0,0,0,.6));
 }
 
+#wealth {
+  position: fixed; top: 56px; left: 18px;
+  font-size: 17px; font-weight: bold; color: #fff;
+  background: rgba(20, 30, 40, .6); padding: 3px 12px; border-radius: 999px;
+  text-shadow: 0 1px 2px rgba(0,0,0,.6); letter-spacing: 1px;
+}
+
 #objective {
   position: fixed; top: 16px; left: 50%; transform: translateX(-50%);
   background: rgba(20, 30, 40, .72); color: #fff;

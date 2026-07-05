@@ -63,6 +63,7 @@ export class World {
     this._buildLake(); // Pista 3 (lago)
     this._buildDragon(); // Pista 4 (dragón)
     this._scatterVegetation();
+    this._scatterCollectibles(); // monedas y estrellas para juntar
 
     // Balizas: la de la cueva visible; las demás aparecen al resolver la anterior
     this._buildBeacon(0, CAVE, 0xffe08a, true);
@@ -866,6 +867,73 @@ export class World {
     rock.receiveShadow = true;
     this.scene.add(rock);
     this.colliders.push({ x, z, r: s * 0.8 });
+  }
+
+  // --------------------------------------------- coleccionables (monedas/estrellas)
+  _scatterCollectibles() {
+    this.collectibles = [];
+    let seed = 90210;
+    const rnd = () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647; };
+    const goldMat = new THREE.MeshStandardMaterial({
+      color: 0xf4c95d, metalness: 0.6, roughness: 0.3,
+      emissive: 0x7a5a00, emissiveIntensity: 0.6, side: THREE.DoubleSide,
+    });
+    const starMat = new THREE.MeshBasicMaterial({ color: 0xffe23a, side: THREE.DoubleSide });
+
+    const place = (type) => {
+      for (let tries = 0; tries < 30; tries++) {
+        const ang = rnd() * Math.PI * 2;
+        const rad = 14 + rnd() * 74;
+        const x = Math.cos(ang) * rad;
+        const z = Math.sin(ang) * rad;
+        const h = terrainHeightAt(x, z);
+        if (h < 1.4 || h > 8.5) continue;
+        if (Math.hypot(x - VOLCANO.x, z - VOLCANO.z) < 20) continue;
+        if (Math.hypot(x - DRAGON.x, z - DRAGON.z) < 12) continue;
+        // no encima de un colisionador
+        let blocked = false;
+        for (const c of this.colliders) { if (Math.hypot(x - c.x, z - c.z) < c.r + 1.2) { blocked = true; break; } }
+        if (blocked) continue;
+
+        const group = new THREE.Group();
+        group.position.set(x, h + 1.1, z);
+        if (type === 'coin') {
+          const coin = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.42, 0.1, 18), goldMat);
+          coin.rotation.x = Math.PI / 2;
+          coin.castShadow = true;
+          group.add(coin);
+        } else {
+          group.add(new THREE.Mesh(this._starGeo(), starMat));
+        }
+        this.scene.add(group);
+        const item = { group, x, z, type, value: type === 'coin' ? 5 : 1, taken: false, phase: rnd() * 6 };
+        this.collectibles.push(item);
+        this._animated.push((t) => {
+          if (item.taken) return;
+          group.rotation.y = t * 2 + item.phase;
+          group.position.y = h + 1.1 + Math.sin(t * 2 + item.phase) * 0.18;
+        });
+        return;
+      }
+    };
+
+    for (let i = 0; i < 20; i++) place('coin');
+    for (let i = 0; i < 6; i++) place('star');
+  }
+
+  _starGeo() {
+    if (this._starGeoCache) return this._starGeoCache;
+    const s = new THREE.Shape();
+    const spikes = 5, outer = 0.55, inner = 0.24;
+    for (let i = 0; i < spikes * 2; i++) {
+      const r = i % 2 ? inner : outer;
+      const a = (i / (spikes * 2)) * Math.PI * 2 - Math.PI / 2;
+      const px = Math.cos(a) * r, py = Math.sin(a) * r;
+      if (i === 0) s.moveTo(px, py); else s.lineTo(px, py);
+    }
+    s.closePath();
+    this._starGeoCache = new THREE.ShapeGeometry(s);
+    return this._starGeoCache;
   }
 
   // --------------------------------------------------------- marcadores UI 3D
