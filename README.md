@@ -4,8 +4,9 @@ Juego 3D en primera persona (WebGL / Three.js) sobre un naufragio y la búsqueda
 de un tesoro. Corre 100% en el navegador, **sin build step** y sin dependencias
 externas en tiempo de ejecución (Three.js está vendorizado en `vendor/`).
 
-> **Estado:** Mundo 1 navegable con las **Pistas 1 (cueva)** y **2 (volcán)**
-> jugables de punta a punta, encadenadas, con sistema de 3 vidas y pistas (hints).
+> **Estado:** Mundo 1 navegable con las **Pistas 1 (cueva)**, **2 (volcán)** y
+> **3 (lago)** jugables de punta a punta, encadenadas, con sistema de 3 vidas,
+> pistas (hints) y controles para **PC y celular**.
 
 ▶️ **Jugar online:** https://jesuslombardo.github.io/isla-del-tesoro/
 (se publica solo vía GitHub Pages en cada push a `main`).
@@ -17,7 +18,9 @@ mapa: la primera marca apunta a una **cueva**. Cada pista te lleva a la siguient
 explorás el lugar, leés una inscripción y con esa clave abrís el **cofre** que
 revela el próximo destino (cueva → volcán → …).
 
-### Controles
+Funciona en **computadora y celular** (se detecta el dispositivo automáticamente).
+
+**En computadora:**
 
 | Tecla | Acción |
 |-------|--------|
@@ -26,6 +29,15 @@ revela el próximo destino (cueva → volcán → …).
 | `Shift` | Correr |
 | `E` | Interactuar (leer inscripción, abrir cofre) |
 | `Esc` | Liberar el mouse / pausa |
+| 💡 Pista | Pedir una ayuda contextual |
+
+**En celular / tablet:**
+
+| Control | Acción |
+|---------|--------|
+| 🕹️ Joystick (abajo izq.) | Moverte |
+| 👆 Deslizar en pantalla | Mirar |
+| ✋ Botón | Interactuar |
 | 💡 Pista | Pedir una ayuda contextual |
 
 ### Reglas
@@ -75,7 +87,7 @@ isla-del-tesoro/
 - [x] Pista 0 · Naufragio (encontrás el mapa) — *punto de partida*
 - [x] **Pista 1 · Cueva** ✅
 - [x] **Pista 2 · Volcán** ✅
-- [ ] Pista 3 · Lago
+- [x] **Pista 3 · Lago** ✅
 - [ ] Pista 4 · Dragón
 - [ ] Subir la montaña → Mundo 2
 

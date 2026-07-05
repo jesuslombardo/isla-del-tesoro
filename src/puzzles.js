@@ -51,6 +51,32 @@ export const PISTAS = [
     solvedText:
       '¡El segundo cofre cede! Adentro, otro pedazo de mapa marca un LAGO ' +
       'de aguas calmas en el corazón de la isla.',
+    nextObjective:
+      'Buscá el LAGO de aguas calmas en el corazón de la isla y su piedra junto al agua.',
+  },
+  {
+    id: 'lago',
+    num: 3,
+    place: 'el lago',
+    inscription:
+      'En una piedra musgosa junto al agua, alguien grabó hace mucho:\n\n' +
+      '  "En el espejo del lago no te mires vos:\n' +
+      '   mirá lo que duerme detrás.\n' +
+      '   Escamas verdes, aliento de fuego,\n' +
+      '   guarda el paso al otro mundo."\n\n' +
+      '(La bestia alada que escupe fuego... la que aparece en los cuentos.)',
+    question:
+      'El reflejo del lago revela a la criatura que custodia el paso. ' +
+      '¿Qué bestia de escamas y fuego es?',
+    answers: ['dragon', 'el dragon', 'draco', 'dragón'],
+    hints: [
+      'Es una criatura de los cuentos: vuela y escupe fuego.',
+      'Tiene escamas verdes y alas enormes.',
+      'Empieza con "D". Es un drag__.',
+    ],
+    solvedText:
+      '¡El tercer cofre se abre! El mapa ahora arde en los bordes: marca la ' +
+      'guarida del DRAGÓN, el guardián del paso hacia el Mundo 2.',
     // Última pista implementada por ahora: al resolverla se muestra la victoria.
     nextObjective: null,
   },

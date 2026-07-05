@@ -17,6 +17,12 @@
 <body>
   <canvas id="game"></canvas>
 
+  <!-- Capa de controles táctiles (celular) -->
+  <div id="touch-layer" class="hidden">
+    <div id="joystick" class="hidden"><div id="joystick-knob"></div></div>
+  </div>
+  <button id="action-btn" class="hidden">✋</button>
+
   <!-- HUD -->
   <div id="hud" class="hidden">
     <div id="lives" aria-label="vidas"></div>
@@ -38,12 +44,17 @@
         <strong>cueva</strong> escondida en la isla.
       </p>
       <p class="hint-line">Explorá la isla, metete en la cueva y descubrí la primera pista para seguir el rastro del tesoro.</p>
-      <div class="controls">
+      <div class="controls" id="controls-desktop">
         <div><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> moverte</div>
         <div><kbd>Mouse</kbd> mirar</div>
         <div><kbd>Shift</kbd> correr</div>
         <div><kbd>E</kbd> interactuar</div>
         <div><kbd>Esc</kbd> liberar mouse</div>
+      </div>
+      <div class="controls hidden" id="controls-mobile">
+        <div>🕹️ Joystick (abajo izq.) para moverte</div>
+        <div>👆 Deslizá en la pantalla para mirar</div>
+        <div>✋ Botón para interactuar</div>
       </div>
       <p class="warn">⚠️ Tenés <strong>3 vidas</strong>. Cuidado con el mar profundo y las trampas de la isla.</p>
       <button id="start-btn" class="big-btn">Explorar la isla ⛵</button>

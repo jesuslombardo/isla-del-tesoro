@@ -24,6 +24,34 @@ html, body {
 
 .hidden { display: none !important; }
 
+/* ---------- Controles táctiles (celular) ---------- */
+#touch-layer {
+  position: fixed; inset: 0; z-index: 5;
+  touch-action: none; overscroll-behavior: none;
+}
+#joystick {
+  position: fixed; width: 110px; height: 110px; border-radius: 50%;
+  background: rgba(255, 255, 255, .12);
+  border: 2px solid rgba(244, 201, 93, .6);
+  box-shadow: 0 0 18px rgba(0,0,0,.35);
+}
+#joystick-knob {
+  position: absolute; left: 50%; top: 50%;
+  width: 52px; height: 52px; border-radius: 50%;
+  transform: translate(-50%, -50%);
+  background: rgba(244, 201, 93, .85);
+  box-shadow: 0 2px 8px rgba(0,0,0,.5);
+}
+#action-btn {
+  position: fixed; bottom: 92px; right: 26px; z-index: 8;
+  width: 78px; height: 78px; border-radius: 50%;
+  background: var(--gold); color: var(--ink);
+  border: 3px solid var(--gold-dark); font-size: 30px;
+  box-shadow: 0 4px 12px rgba(0,0,0,.5); cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+}
+#action-btn:active { transform: scale(.92); }
+
 /* ---------- HUD ---------- */
 #hud { position: fixed; inset: 0; pointer-events: none; }
 
@@ -164,3 +192,19 @@ pre#clue-text {
 #damage-flash.show { opacity: 1; }
 
 .big-btn, .ghost-btn, #hint-btn { font-family: inherit; }
+
+/* ---------- Ajustes para celular ---------- */
+@media (max-width: 600px) {
+  #objective {
+    border-radius: 14px; font-size: 13px; padding: 6px 12px;
+    top: 10px; max-width: 66vw; flex-wrap: wrap; justify-content: center;
+  }
+  #lives { font-size: 24px; top: 12px; left: 12px; }
+  #hint-btn { bottom: 16px; right: 16px; padding: 8px 14px; font-size: 13px; }
+  #prompt { bottom: 180px; font-size: 14px; padding: 8px 14px; }
+  .card { padding: 22px 20px; }
+  .card h1 { font-size: 26px; }
+  .card h2 { font-size: 21px; }
+  .card p { font-size: 15px; }
+  pre#clue-text { font-size: 14px; padding: 14px; }
+}

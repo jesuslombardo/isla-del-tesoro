@@ -15,6 +15,8 @@ export const SPAWN = new THREE.Vector3(14, 0, 60); // en el naufragio
 export const CAVE = new THREE.Vector3(-34, 0, -14); // Pista 1
 export const VOLCANO = new THREE.Vector3(48, 0, -46); // Pista 2 (cono)
 export const SHRINE = new THREE.Vector3(32, 0, -31); // altar de Pista 2 (accesible)
+export const LAKE = new THREE.Vector3(-8, 0, 30); // Pista 3 (lago)
+const LAKE_R = 7; // radio del espejo de agua
 
 // --- Altura del terreno: isla como montículo radial con colinas suaves --------
 export function terrainHeightAt(x, z) {
@@ -57,11 +59,13 @@ export class World {
     this._buildCave(); // Pista 1
     this._buildVolcano(); // cono decorativo + colisión
     this._buildVolcanoShrine(); // Pista 2 (altar accesible)
+    this._buildLake(); // Pista 3 (lago)
     this._scatterVegetation();
 
-    // Balizas: la de la cueva visible; la del volcán aparece al resolver Pista 1
+    // Balizas: la de la cueva visible; las demás aparecen al resolver la anterior
     this._buildBeacon(0, CAVE, 0xffe08a, true);
     this._buildBeacon(1, SHRINE, 0xff9a5a, false);
+    this._buildBeacon(2, LAKE, 0x7ad0ff, false);
   }
 
   // --------------------------------------------------------------- cielo / luz
@@ -377,6 +381,101 @@ export class World {
     this.colliders.push({ x: chest.position.x, z: chest.position.z, r: 1.6 });
   }
 
+  // -------------------------------------------------------------- lago (P3)
+  _buildLake() {
+    const cx = LAKE.x;
+    const cz = LAKE.z;
+    const ground = terrainHeightAt(cx, cz);
+
+    // Espejo de agua (disco reflectante)
+    const waterGeo = new THREE.CircleGeometry(LAKE_R, 48);
+    waterGeo.rotateX(-Math.PI / 2);
+    const waterMat = new THREE.MeshStandardMaterial({
+      color: 0x2a7fb8, transparent: true, opacity: 0.8, roughness: 0.12, metalness: 0.35,
+    });
+    const water = new THREE.Mesh(waterGeo, waterMat);
+    water.position.set(cx, ground + 0.08, cz);
+    water.receiveShadow = true;
+    this.scene.add(water);
+    this._animated.push((t) => {
+      waterMat.color.setHSL(0.55, 0.6, 0.4 + Math.sin(t * 1.5) * 0.05);
+    });
+
+    // Orilla de piedras
+    for (let a = 0; a < Math.PI * 2; a += Math.PI / 9) {
+      const rx = cx + Math.cos(a) * (LAKE_R + 0.6);
+      const rz = cz + Math.sin(a) * (LAKE_R + 0.6);
+      const s = 0.6 + Math.abs(Math.sin(a * 3)) * 0.5;
+      const rock = new THREE.Mesh(
+        new THREE.DodecahedronGeometry(s, 0),
+        new THREE.MeshStandardMaterial({ color: 0x7d766a, roughness: 1 })
+      );
+      rock.position.set(rx, terrainHeightAt(rx, rz) + s * 0.3, rz);
+      rock.rotation.set(a, a, a);
+      rock.castShadow = true;
+      this.scene.add(rock);
+    }
+
+    // Juncos alrededor del agua
+    const reedMat = new THREE.MeshStandardMaterial({ color: 0x4f8a3a, roughness: 1 });
+    for (let i = 0; i < 14; i++) {
+      const a = (i / 14) * Math.PI * 2 + 0.3;
+      const rr = LAKE_R * 0.78 + (i % 3) * 0.4;
+      const rx = cx + Math.cos(a) * rr;
+      const rz = cz + Math.sin(a) * rr;
+      const h = 1.4 + (i % 3) * 0.4;
+      const reed = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.09, h, 5), reedMat);
+      reed.position.set(rx, ground + h / 2, rz);
+      reed.rotation.z = Math.sin(i) * 0.2;
+      reed.castShadow = true;
+      this.scene.add(reed);
+    }
+
+    // Nenúfares flotando
+    const padMat = new THREE.MeshStandardMaterial({ color: 0x3f9b47, roughness: 1, side: THREE.DoubleSide });
+    for (let i = 0; i < 5; i++) {
+      const a = i * 1.3;
+      const rr = LAKE_R * 0.5;
+      const pad = new THREE.Mesh(new THREE.CircleGeometry(0.8, 10), padMat);
+      pad.rotateX(-Math.PI / 2);
+      pad.position.set(cx + Math.cos(a) * rr, ground + 0.12, cz + Math.sin(a) * rr);
+      this.scene.add(pad);
+    }
+
+    // Piedra musgosa con la inscripción
+    const tx = cx;
+    const tz = cz - (LAKE_R + 2);
+    const tg = terrainHeightAt(tx, tz);
+    const tablet = new THREE.Mesh(
+      new THREE.BoxGeometry(3, 2.4, 0.6),
+      new THREE.MeshStandardMaterial({ color: 0x5c6b4a, roughness: 1 })
+    );
+    tablet.position.set(tx, tg + 1.2, tz);
+    tablet.rotation.set(-0.12, 0.2, 0);
+    tablet.castShadow = true;
+    tablet.receiveShadow = true;
+    this.scene.add(tablet);
+    this._glowMark(tx, tg + 2.6, tz, 0x9be2ff);
+
+    // Cofre de la Pista 3
+    const chx = cx + (LAKE_R + 2);
+    const chz = cz;
+    const chest = this._buildChest(chx, terrainHeightAt(chx, chz), chz, 2);
+
+    this.interactables.push({
+      id: 'insc-2', kind: 'inscription', pistaIdx: 2,
+      position: new THREE.Vector3(tx, tg + 1.2, tz), radius: 4.5,
+      prompt: 'Presioná [E] para leer la piedra musgosa',
+    });
+    this.interactables.push({
+      id: 'chest-2', kind: 'chest', pistaIdx: 2,
+      position: chest.position.clone(), radius: 4,
+      prompt: 'Presioná [E] para abrir el cofre',
+    });
+    this.colliders.push({ x: tx, z: tz, r: 1.8 });
+    this.colliders.push({ x: chx, z: chz, r: 1.6 });
+  }
+
   // ------------------------------------------------------------------- cofre
   _buildChest(x, ground, z, idx) {
     const g = new THREE.Group();
@@ -459,6 +558,7 @@ export class World {
       if (Math.hypot(x - CAVE.x, z - CAVE.z) < 12) continue;
       if (Math.hypot(x - VOLCANO.x, z - VOLCANO.z) < 22) continue;
       if (Math.hypot(x - SHRINE.x, z - SHRINE.z) < 11) continue;
+      if (Math.hypot(x - LAKE.x, z - LAKE.z) < LAKE_R + 5) continue;
       if (Math.hypot(x - SPAWN.x, z - SPAWN.z) < 10) continue;
       if (rnd() < 0.6) this._palm(x, h, z, rnd);
       else this._rock(x, h, z, rnd);

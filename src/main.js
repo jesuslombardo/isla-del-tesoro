@@ -2,7 +2,11 @@ import * as THREE from 'three';
 import { World, SPAWN, CAVE, terrainHeightAt } from './world.js';
 import { Player } from './player.js';
 import { HUD } from './hud.js';
+import { TouchControls } from './touch.js';
 import { PISTAS, isCorrect } from './puzzles.js';
+
+// Detección de dispositivo táctil (celular/tablet)
+const IS_TOUCH = window.matchMedia('(pointer: coarse)').matches || 'ontouchstart' in window;
 
 // ============================================================================
 //  La Isla del Tesoro
@@ -21,9 +25,18 @@ const camera = new THREE.PerspectiveCamera(72, window.innerWidth / window.innerH
 
 const world = new World(scene);
 const player = new Player(camera, canvas, world);
+player.mobile = IS_TOUCH;
 scene.add(player.object);
 
 const hud = new HUD();
+const touch = IS_TOUCH ? new TouchControls(player) : null;
+const actionBtn = document.getElementById('action-btn');
+
+// ¿El juego está aceptando input ahora mismo?
+function playing() {
+  return state.started && !state.modalOpen && !state.won && !state.over &&
+    (player.mobile || player.controls.isLocked);
+}
 
 const state = {
   lives: 3,
@@ -106,13 +119,13 @@ function showRiddleHint(pista) {
 // --------------------------------------------------------- modales / puntero
 function openModal(show) {
   state.modalOpen = true;
-  if (player.controls.isLocked) player.controls.unlock();
+  if (!player.mobile && player.controls.isLocked) player.controls.unlock();
   show();
 }
 function closeModal(hide) {
   hide();
   state.modalOpen = false;
-  if (state.started && !state.won && !state.over) player.controls.lock();
+  if (!player.mobile && state.started && !state.won && !state.over) player.controls.lock();
 }
 
 // ------------------------------------------------------------------ peligros
@@ -125,7 +138,7 @@ function onDanger(msg) {
   if (state.lives <= 0) {
     state.over = true;
     state.modalOpen = true;
-    if (player.controls.isLocked) player.controls.unlock();
+    if (!player.mobile && player.controls.isLocked) player.controls.unlock();
     hud.showGameOver();
   } else {
     player.spawn(state.safePos);
@@ -142,13 +155,24 @@ function startGame() {
   player.enabled = true;
   player.spawn(SPAWN);
   player.lookAt(CAVE);
-  player.controls.lock();
+  if (player.mobile) touch.enable();
+  else player.controls.lock();
 }
 
 function restart() { window.location.reload(); }
 
 // --------------------------------------------------------------- event wiring
+// Muestra las instrucciones acordes al dispositivo
+if (IS_TOUCH) {
+  document.getElementById('controls-desktop').classList.add('hidden');
+  document.getElementById('controls-mobile').classList.remove('hidden');
+}
+
 hud.el.startBtn.addEventListener('click', startGame);
+// Botón de acción táctil: interactúa con lo que esté en rango
+actionBtn.addEventListener('click', () => {
+  if (state.active && !state.modalOpen) handleInteract(state.active);
+});
 hud.el.resumeBtn.addEventListener('click', () => {
   hud.hideResume();
   player.controls.lock();
@@ -199,7 +223,7 @@ window.addEventListener('resize', () => {
 
 // --------------------------------------------------------- detección de rango
 function updateInteraction() {
-  if (state.modalOpen || !player.controls.isLocked) { hud.hidePrompt(); state.active = null; return; }
+  if (!playing()) { hud.hidePrompt(); actionBtn.classList.add('hidden'); state.active = null; return; }
   const p = player.object.position;
   let best = null;
   let bestD = Infinity;
@@ -210,8 +234,14 @@ function updateInteraction() {
     if (d < it.radius && d < bestD) { best = it; bestD = d; }
   }
   state.active = best;
-  if (best) hud.showPrompt(best.prompt);
-  else hud.hidePrompt();
+  if (best) {
+    // En celular el prompt dice "tocá el botón"; en desktop dice [E]
+    hud.showPrompt(player.mobile ? best.prompt.replace('Presioná [E]', 'Tocá ✋') : best.prompt);
+    if (player.mobile) actionBtn.classList.remove('hidden');
+  } else {
+    hud.hidePrompt();
+    actionBtn.classList.add('hidden');
+  }
 }
 
 // Último punto seguro (para respawnear tras un peligro)
@@ -230,11 +260,11 @@ function animate() {
   requestAnimationFrame(animate);
   const dt = Math.min(clock.getDelta(), 0.05);
   world.update(dt);
-  if (state.started && !state.won && !state.over) {
+  if (state.started && !state.modalOpen && !state.won && !state.over) {
     player.update(dt, { onDanger });
     updateSafePos();
-    updateInteraction();
   }
+  updateInteraction();
   renderer.render(scene, camera);
 }
 animate();
