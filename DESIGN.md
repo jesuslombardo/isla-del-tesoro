@@ -91,4 +91,42 @@ Naufragás en una isla y seguís un rastro de pistas hasta el cofre del tesoro.
 
 ---
 
+---
+
+## 📱 Celular / Inventario (idea nueva)
+
+En el HUD hay un **celular chiquito**. Al apretarlo, se abre un **celular grande**
+con una pantalla y varias **apps**:
+
+- **🗺️ Mapa**: muestra el mapa del mundo actual. Al pasar de mundo, el mapa del
+  Mundo 1 desaparece y aparece el del Mundo 2 (hay dos mapas dibujados que se
+  intercambian).
+- **❤️ Vidas**: cuántas vidas te quedan.
+- **💎 Plata / Diamantes / Estrellas**: cuánta "plata" (diamantes o estrellas)
+  tenés juntada.
+- **🍗 Comida / Panza**: cuánta comida tenés; si la panza está vacía, hay que
+  comer.
+- **🧑 Tienda de personajes**: aparecen imágenes de personajes (los invento yo),
+  y abajo de cada uno el precio en diamantes/estrellas. Comprás uno y en el
+  juego **aparecés con ese personaje** (ese estilo).
+- **🖼️ Fondo de pantalla del celu**: comprás fondos para la pantalla del celular
+  (ej: Stitch, Mario Bros, u otros que invento), cada uno con su precio.
+
+### Navegación del celular
+- Cada **app** tiene una **flecha para volver** a la pantalla de apps del celular.
+- La pantalla de apps del celular tiene una **flecha para salir** y volver al
+  juego (queda el celular chiquito en el HUD y seguís jugando).
+
+### 💰 Economía
+- Moneda: **diamantes / estrellas** ("plata").
+- Se gastan en la tienda (personajes y fondos).
+- *(Pendiente definir: cómo se ganan — resolviendo pistas, juntando estrellas
+  en el mapa, etc.)*
+
+> Nota: es un sistema grande (UI de celular + apps + economía + skins + comida).
+> Conviene construirlo por etapas: primero el celular con Mapa/Vidas/Plata, y
+> después la tienda de personajes, fondos y la comida.
+
+---
+
 *Este documento se irá actualizando a medida que construimos cada escena.*
