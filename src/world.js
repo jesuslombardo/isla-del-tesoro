@@ -18,6 +18,18 @@ export const SHRINE = new THREE.Vector3(32, 0, -31); // altar de Pista 2 (accesi
 export const LAKE = new THREE.Vector3(-8, 0, 30); // Pista 3 (lago)
 const LAKE_R = 7; // radio del espejo de agua
 export const DRAGON = new THREE.Vector3(-52, 0, -8); // Pista 4 (guarida del dragón)
+export const MOUNTAIN = new THREE.Vector3(8, 0, -34); // montaña con portal al Mundo 2
+// Mundo 2 (el bosque)
+export const SPAWN2 = new THREE.Vector3(0, 0, 8); // aparición en el Mundo 2
+export const MINE = new THREE.Vector3(0, 0, -28); // Pista 5 (carrito minero)
+
+// Terreno del bosque (Mundo 2): colinas suaves, siempre sobre el nivel 0.
+export function forestHeightAt(x, z) {
+  let h = 3;
+  h += Math.sin(x * 0.05) * Math.cos(z * 0.06) * 2.2;
+  h += Math.sin(x * 0.11 + 1.3) * Math.sin(z * 0.09) * 1.0;
+  return h;
+}
 
 // --- Altura del terreno: isla como montículo radial con colinas suaves --------
 export function terrainHeightAt(x, z) {
@@ -41,17 +53,48 @@ function heightColor(h, color) {
 }
 
 export class World {
-  constructor(scene) {
+  constructor(scene, variant = 'isla') {
     this.scene = scene;
+    this.variant = variant;
+    this.root = new THREE.Group(); // todo lo del mundo cuelga de acá (para liberarlo)
+    scene.add(this.root);
     this.colliders = []; // { x, z, r }
     this.traps = []; // { x, z, r }
     this.interactables = []; // { id, kind, pistaIdx, position, radius, prompt }
     this.chests = []; // grupo del cofre por pista
     this.chestLids = []; // tapa del cofre por pista
     this.beacons = []; // haz de luz guía por pista
+    this.collectibles = [];
     this._animated = []; // objetos con update(t)
     this._time = 0;
 
+    if (variant === 'bosque') {
+      this.heightAt = forestHeightAt;
+      this.waterLevel = -900; // sin mar
+      this.drownLevel = -900; // no te ahogás en el bosque
+      this._buildForest();
+    } else {
+      this.heightAt = terrainHeightAt;
+      this.waterLevel = WATER_LEVEL;
+      this.drownLevel = DROWN_LEVEL;
+      this._buildIsla();
+    }
+  }
+
+  // Todo lo visual cuelga de root, para poder liberarlo al cambiar de mundo.
+  add(obj) { this.root.add(obj); }
+
+  dispose() {
+    this.scene.remove(this.root);
+    this._animated = [];
+    this.interactables = [];
+    this.collectibles = [];
+    this.traps = [];
+    this.colliders = [];
+  }
+
+  // ------------------------------------------------------- Mundo 1 (la isla)
+  _buildIsla() {
     this._buildSky();
     this._buildLights();
     this._buildTerrain();
@@ -62,6 +105,7 @@ export class World {
     this._buildVolcanoShrine(); // Pista 2 (altar accesible)
     this._buildLake(); // Pista 3 (lago)
     this._buildDragon(); // Pista 4 (dragón)
+    this._buildMountainPortal(); // montaña + portal al Mundo 2 (se activa al pasar la P4)
     this._scatterVegetation();
     this._scatterCollectibles(); // monedas y estrellas para juntar
 
@@ -96,7 +140,7 @@ export class World {
         }
       `,
     });
-    this.scene.add(new THREE.Mesh(geo, mat));
+    this.add(new THREE.Mesh(geo, mat));
   }
 
   _buildLights() {
@@ -110,8 +154,8 @@ export class World {
     sun.shadow.camera.top = d;
     sun.shadow.camera.bottom = -d;
     sun.shadow.camera.far = 400;
-    this.scene.add(sun);
-    this.scene.add(new THREE.HemisphereLight(0xbfe0ee, 0x5a6a3a, 0.7));
+    this.add(sun);
+    this.add(new THREE.HemisphereLight(0xbfe0ee, 0x5a6a3a, 0.7));
   }
 
   // ------------------------------------------------------------------ terreno
@@ -136,7 +180,7 @@ export class World {
     const mat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1 });
     const mesh = new THREE.Mesh(geo, mat);
     mesh.receiveShadow = true;
-    this.scene.add(mesh);
+    this.add(mesh);
   }
 
   // -------------------------------------------------------------------- agua
@@ -152,7 +196,7 @@ export class World {
     });
     const water = new THREE.Mesh(geo, mat);
     water.position.y = WATER_LEVEL;
-    this.scene.add(water);
+    this.add(water);
     this._waterBase = geo.attributes.position.array.slice();
     this._animated.push((t) => {
       const p = geo.attributes.position;
@@ -228,7 +272,7 @@ export class World {
     g.position.set(SPAWN.x, y - 0.6, wz);
     g.rotation.y = -0.7;
     g.rotation.z = 0.1; // escorado (encallado)
-    this.scene.add(g);
+    this.add(g);
     this.colliders.push({ x: SPAWN.x, z: wz, r: 5.8 });
 
     // Botín a la vista en la arena seca: cofre de oro abierto + comida (barriles y frutas)
@@ -258,7 +302,7 @@ export class World {
     g.traverse((o) => { o.castShadow = true; o.receiveShadow = true; });
     g.position.set(x, ground, z);
     g.rotation.y = 0.4;
-    this.scene.add(g);
+    this.add(g);
     this.colliders.push({ x, z, r: 1.3 });
   }
 
@@ -286,7 +330,7 @@ export class World {
     }
     g.traverse((o) => { o.castShadow = true; o.receiveShadow = true; });
     g.position.set(x, ground, z);
-    this.scene.add(g);
+    this.add(g);
     this.colliders.push({ x, z, r: 0.8 });
   }
 
@@ -311,7 +355,7 @@ export class World {
       boulder.rotation.set(a, a * 1.7, a * 0.3);
       boulder.castShadow = true;
       boulder.receiveShadow = true;
-      this.scene.add(boulder);
+      this.add(boulder);
       this.colliders.push({ x: bx, z: bz, r: s * 0.9 });
     }
 
@@ -319,24 +363,24 @@ export class World {
     const roof = new THREE.Mesh(new THREE.SphereGeometry(9, 16, 12, 0, Math.PI * 2, 0, Math.PI / 2), darkRock);
     roof.position.set(cx, ground + 7, cz);
     roof.castShadow = true;
-    this.scene.add(roof);
+    this.add(roof);
 
     // Losa con la inscripción
     const slab = new THREE.Mesh(new THREE.BoxGeometry(4.5, 4, 0.6), darkRock);
     slab.position.set(cx - 5.2, ground + 2, cz - 4);
     slab.rotation.y = 0.6;
     slab.castShadow = true;
-    this.scene.add(slab);
+    this.add(slab);
     this._glowMark(cx - 4.6, ground + 3.4, cz - 3.4, 0xffd27a);
 
     // Antorcha (luz + llama parpadeante)
     const torchPos = new THREE.Vector3(cx + 3, ground + 3, cz - 3);
     const torchLight = new THREE.PointLight(0xffa64d, 3.2, 26, 2);
     torchLight.position.copy(torchPos);
-    this.scene.add(torchLight);
+    this.add(torchLight);
     const flame = new THREE.Mesh(new THREE.ConeGeometry(0.4, 1.1, 8), new THREE.MeshBasicMaterial({ color: 0xffb347 }));
     flame.position.copy(torchPos);
-    this.scene.add(flame);
+    this.add(flame);
     this._animated.push((t) => {
       const f = 0.75 + Math.sin(t * 18) * 0.15 + Math.sin(t * 7) * 0.1;
       torchLight.intensity = 3.2 * f;
@@ -375,15 +419,15 @@ export class World {
     cone.position.set(x, base + height / 2, z);
     cone.castShadow = true;
     cone.receiveShadow = true;
-    this.scene.add(cone);
+    this.add(cone);
 
     const crater = new THREE.Mesh(new THREE.CircleGeometry(4, 20), new THREE.MeshBasicMaterial({ color: 0xff5522 }));
     crater.rotation.x = -Math.PI / 2;
     crater.position.set(x, base + height - 0.5, z);
-    this.scene.add(crater);
+    this.add(crater);
     const lavaLight = new THREE.PointLight(0xff5522, 2.5, 60, 2);
     lavaLight.position.set(x, base + height + 2, z);
-    this.scene.add(lavaLight);
+    this.add(lavaLight);
 
     this.colliders.push({ x, z, r: 18 }); // no se puede atravesar
 
@@ -394,7 +438,7 @@ export class World {
       const puff = new THREE.Mesh(new THREE.SphereGeometry(3, 8, 8), smokeMat.clone());
       puff.position.set(x, base + height, z);
       puff.userData.o = Math.random() * 6;
-      this.scene.add(puff);
+      this.add(puff);
       puffs.push(puff);
     }
     const topY = base + height;
@@ -423,7 +467,7 @@ export class World {
     obelisk.rotation.y = 0.4;
     obelisk.castShadow = true;
     obelisk.receiveShadow = true;
-    this.scene.add(obelisk);
+    this.add(obelisk);
 
     // Vetas de lava brillante en el obelisco
     const veins = new THREE.Mesh(
@@ -432,7 +476,7 @@ export class World {
     );
     veins.position.set(sx, ground + 2.5, sz);
     veins.rotation.y = 0.4;
-    this.scene.add(veins);
+    this.add(veins);
     this._animated.push((t) => {
       veins.material.color.setHSL(0.03, 1, 0.45 + Math.sin(t * 4) * 0.12);
     });
@@ -447,7 +491,7 @@ export class World {
       r.position.set(rx, terrainHeightAt(rx, rz) + s * 0.4, rz);
       r.rotation.set(a, a, a);
       r.castShadow = true;
-      this.scene.add(r);
+      this.add(r);
       this.colliders.push({ x: rx, z: rz, r: s * 0.8 });
     }
 
@@ -483,7 +527,7 @@ export class World {
     const water = new THREE.Mesh(waterGeo, waterMat);
     water.position.set(cx, ground + 0.08, cz);
     water.receiveShadow = true;
-    this.scene.add(water);
+    this.add(water);
     this._animated.push((t) => {
       waterMat.color.setHSL(0.55, 0.6, 0.4 + Math.sin(t * 1.5) * 0.05);
     });
@@ -500,7 +544,7 @@ export class World {
       rock.position.set(rx, terrainHeightAt(rx, rz) + s * 0.3, rz);
       rock.rotation.set(a, a, a);
       rock.castShadow = true;
-      this.scene.add(rock);
+      this.add(rock);
     }
 
     // Juncos alrededor del agua
@@ -515,7 +559,7 @@ export class World {
       reed.position.set(rx, ground + h / 2, rz);
       reed.rotation.z = Math.sin(i) * 0.2;
       reed.castShadow = true;
-      this.scene.add(reed);
+      this.add(reed);
     }
 
     // Nenúfares flotando
@@ -526,7 +570,7 @@ export class World {
       const pad = new THREE.Mesh(new THREE.CircleGeometry(0.8, 10), padMat);
       pad.rotateX(-Math.PI / 2);
       pad.position.set(cx + Math.cos(a) * rr, ground + 0.12, cz + Math.sin(a) * rr);
-      this.scene.add(pad);
+      this.add(pad);
     }
 
     // Piedra musgosa con la inscripción
@@ -541,7 +585,7 @@ export class World {
     tablet.rotation.set(-0.12, 0.2, 0);
     tablet.castShadow = true;
     tablet.receiveShadow = true;
-    this.scene.add(tablet);
+    this.add(tablet);
     this._glowMark(tx, tg + 2.6, tz, 0x9be2ff);
 
     // Cofre de la Pista 3
@@ -578,7 +622,7 @@ export class World {
     // Grupo del dragón: mira hacia +X (de donde llega el jugador)
     const d = new THREE.Group();
     d.position.set(cx, ground, cz);
-    this.scene.add(d);
+    this.add(d);
 
     // Cuerpo (elipsoide)
     const body = new THREE.Mesh(new THREE.SphereGeometry(2, 18, 14), green);
@@ -663,13 +707,13 @@ export class World {
     hoard.position.set(hoardX, terrainHeightAt(hoardX, hoardZ), hoardZ);
     hoard.scale.set(1.4, 0.5, 1.4);
     hoard.castShadow = true;
-    this.scene.add(hoard);
+    this.add(hoard);
     const plaque = new THREE.Mesh(new THREE.BoxGeometry(2.4, 1.8, 0.4), gold);
     const pg = terrainHeightAt(hoardX, hoardZ);
     plaque.position.set(hoardX, pg + 1.4, hoardZ);
     plaque.rotation.set(-0.25, 0.3, 0);
     plaque.castShadow = true;
-    this.scene.add(plaque);
+    this.add(plaque);
     this._glowMark(hoardX, pg + 2.8, hoardZ, 0xffe08a);
 
     // Cofre de la Pista 4 (al costado sur, para llegar rodeando el fuego)
@@ -683,7 +727,7 @@ export class World {
     const mouthZ = cz;
     const fireGroup = new THREE.Group();
     fireGroup.position.set(mouthX, mouthY, mouthZ);
-    this.scene.add(fireGroup);
+    this.add(fireGroup);
     const fireColors = [0xffe23a, 0xffa020, 0xff5a10, 0xff2a05];
     for (let i = 0; i < 4; i++) {
       const flame = new THREE.Mesh(
@@ -696,7 +740,7 @@ export class World {
     }
     const fireLight = new THREE.PointLight(0xff5a10, 0, 30, 2);
     fireLight.position.set(mouthX + 3, mouthY, mouthZ);
-    this.scene.add(fireLight);
+    this.add(fireLight);
 
     // Zona de peligro del fuego (trampa que se activa solo en la ráfaga)
     const fireTrap = { x: mouthX + 3, z: mouthZ, r: 4.6, active: false, msg: '¡El dragón te quemó con su fuego! 🔥' };
@@ -766,7 +810,7 @@ export class World {
 
     g.traverse((o) => { o.castShadow = true; o.receiveShadow = true; });
     g.position.set(x, ground, z);
-    this.scene.add(g);
+    this.add(g);
     this.chests[idx] = g;
     this.chestLids[idx] = lid;
     return g;
@@ -793,7 +837,7 @@ export class World {
     const ring = new THREE.Mesh(new THREE.CircleGeometry(2.6, 24), new THREE.MeshBasicMaterial({ color: 0x0a0a0a }));
     ring.rotation.x = -Math.PI / 2;
     ring.position.set(x, y + 0.05, z);
-    this.scene.add(ring);
+    this.add(ring);
     const edge = new THREE.Mesh(
       new THREE.TorusGeometry(2.6, 0.35, 8, 20),
       new THREE.MeshStandardMaterial({ color: 0x5b5348, roughness: 1 })
@@ -801,7 +845,7 @@ export class World {
     edge.rotation.x = -Math.PI / 2;
     edge.position.set(x, y + 0.1, z);
     edge.castShadow = true;
-    this.scene.add(edge);
+    this.add(edge);
     this.traps.push({ x, z, r: 2.2 });
   }
 
@@ -851,7 +895,7 @@ export class World {
     }
     g.traverse((o) => { o.castShadow = true; });
     g.position.set(x, y, z);
-    this.scene.add(g);
+    this.add(g);
     this.colliders.push({ x, z, r: 0.8 });
   }
 
@@ -865,7 +909,7 @@ export class World {
     rock.rotation.set(rnd() * 3, rnd() * 3, rnd() * 3);
     rock.castShadow = true;
     rock.receiveShadow = true;
-    this.scene.add(rock);
+    this.add(rock);
     this.colliders.push({ x, z, r: s * 0.8 });
   }
 
@@ -905,7 +949,7 @@ export class World {
         } else {
           group.add(new THREE.Mesh(this._starGeo(), starMat));
         }
-        this.scene.add(group);
+        this.add(group);
         const item = { group, x, z, type, value: type === 'coin' ? 5 : 1, taken: false, phase: rnd() * 6 };
         this.collectibles.push(item);
         this._animated.push((t) => {
@@ -943,7 +987,7 @@ export class World {
       new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.9 })
     );
     m.position.set(x, y, z);
-    this.scene.add(m);
+    this.add(m);
     this._animated.push((t) => {
       m.position.y = y + Math.sin(t * 2) * 0.15;
     });
@@ -952,14 +996,14 @@ export class World {
 
   // Haz de luz que guía hacia una pista
   _buildBeacon(idx, pos, color, visible) {
-    const y = terrainHeightAt(pos.x, pos.z);
+    const y = this.heightAt(pos.x, pos.z);
     const beam = new THREE.Mesh(
       new THREE.CylinderGeometry(0.6, 2, 40, 12, 1, true),
       new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.22, side: THREE.DoubleSide })
     );
     beam.position.set(pos.x, y + 20, pos.z);
     beam.visible = visible;
-    this.scene.add(beam);
+    this.add(beam);
     this.beacons[idx] = beam;
     this._animated.push((t) => {
       beam.material.opacity = 0.18 + Math.sin(t * 2) * 0.08;
@@ -968,6 +1012,216 @@ export class World {
 
   showBeacon(idx) { if (this.beacons[idx]) this.beacons[idx].visible = true; }
   hideBeacon(idx) { if (this.beacons[idx]) this.beacons[idx].visible = false; }
+
+  // ----------------------------------------------- montaña + portal al Mundo 2
+  _buildMountainPortal() {
+    const cx = MOUNTAIN.x, cz = MOUNTAIN.z;
+    const base = terrainHeightAt(cx, cz);
+    const height = 30;
+    const rock = new THREE.MeshStandardMaterial({ color: 0x6f6a63, roughness: 1 });
+    const mtn = new THREE.Mesh(new THREE.ConeGeometry(16, height, 8), rock);
+    mtn.position.set(cx, base + height / 2, cz);
+    mtn.castShadow = true; mtn.receiveShadow = true;
+    this.add(mtn);
+    const snow = new THREE.Mesh(new THREE.ConeGeometry(6, 9, 8), new THREE.MeshStandardMaterial({ color: 0xf2f6fb, roughness: 1 }));
+    snow.position.set(cx, base + height - 4.5, cz);
+    this.add(snow);
+
+    // Portal (arco brillante) al pie de la montaña, mirando +Z
+    const portalZ = cz + 15;
+    const pg = terrainHeightAt(cx, portalZ);
+    const arch = new THREE.Mesh(
+      new THREE.TorusGeometry(2.6, 0.6, 10, 20, Math.PI),
+      new THREE.MeshStandardMaterial({ color: 0x5a4b86, emissive: 0x3a2a66, emissiveIntensity: 0.6, roughness: 0.6 })
+    );
+    arch.position.set(cx, pg + 2.4, portalZ);
+    this.add(arch);
+    const portal = new THREE.Mesh(
+      new THREE.CircleGeometry(2.5, 24),
+      new THREE.MeshBasicMaterial({ color: 0x9a7be0, transparent: true, opacity: 0.85 })
+    );
+    portal.position.set(cx, pg + 2.4, portalZ + 0.06);
+    this.add(portal);
+    this._animated.push((t) => {
+      portal.material.opacity = 0.55 + Math.sin(t * 3) * 0.22;
+      portal.scale.setScalar(1 + Math.sin(t * 2) * 0.04);
+    });
+
+    this.colliders.push({ x: cx, z: cz, r: 11 }); // no atravesar la montaña
+    this.interactables.push({
+      id: 'portal', kind: 'portal', pistaIdx: 4,
+      position: new THREE.Vector3(cx, pg + 2, portalZ), radius: 4.5,
+      prompt: 'Presioná [E] para cruzar el portal al Mundo 2',
+    });
+    const beam = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.6, 2, 44, 12, 1, true),
+      new THREE.MeshBasicMaterial({ color: 0xb69bff, transparent: true, opacity: 0.22, side: THREE.DoubleSide })
+    );
+    beam.position.set(cx, pg + 22, portalZ);
+    beam.visible = false;
+    this.add(beam);
+    this._portalBeacon = beam;
+  }
+  showPortalBeacon() { if (this._portalBeacon) this._portalBeacon.visible = true; }
+
+  // ==================================================== Mundo 2 (el bosque) ===
+  _buildForest() {
+    this.scene.background = new THREE.Color(0x2a3d2c);
+    this.scene.fog = new THREE.Fog(0x33482f, 34, 180);
+
+    const sun = new THREE.DirectionalLight(0xe6f6dc, 1.0);
+    sun.position.set(40, 70, 20);
+    sun.castShadow = true;
+    sun.shadow.mapSize.set(1024, 1024);
+    const d = 110;
+    sun.shadow.camera.left = -d; sun.shadow.camera.right = d;
+    sun.shadow.camera.top = d; sun.shadow.camera.bottom = -d; sun.shadow.camera.far = 300;
+    this.add(sun);
+    this.add(new THREE.HemisphereLight(0x9ab890, 0x2a3a24, 0.95));
+
+    // Suelo del bosque
+    const geo = new THREE.PlaneGeometry(300, 300, 120, 120);
+    geo.rotateX(-Math.PI / 2);
+    const pos = geo.attributes.position;
+    const colors = [];
+    const c = new THREE.Color();
+    for (let i = 0; i < pos.count; i++) {
+      const x = pos.getX(i), z = pos.getZ(i);
+      const h = forestHeightAt(x, z);
+      pos.setY(i, h);
+      c.setHex(h > 4.2 ? 0x40602f : 0x35502a);
+      colors.push(c.r, c.g, c.b);
+    }
+    geo.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+    geo.computeVertexNormals();
+    const ground = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1 }));
+    ground.receiveShadow = true;
+    this.add(ground);
+
+    // Pinos del bosque
+    let seed = 4242;
+    const rnd = () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647; };
+    for (let i = 0; i < 130; i++) {
+      const x = (rnd() - 0.5) * 220;
+      const z = (rnd() - 0.5) * 220;
+      if (Math.hypot(x - MINE.x, z - MINE.z) < 16) continue;
+      if (Math.hypot(x - SPAWN2.x, z - SPAWN2.z) < 8) continue;
+      this._pine(x, z, rnd);
+    }
+
+    this._buildMine(); // Pista 5
+    this._buildBeacon(4, MINE, 0xffb14a, true);
+  }
+
+  _pine(x, z, rnd) {
+    const y = forestHeightAt(x, z);
+    const g = new THREE.Group();
+    const trunkH = 1.8 + rnd() * 1.2;
+    const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.42, trunkH, 6), new THREE.MeshStandardMaterial({ color: 0x5a3d22, roughness: 1 }));
+    trunk.position.y = trunkH / 2;
+    g.add(trunk);
+    const leaf = new THREE.MeshStandardMaterial({ color: 0x2f5a2c, roughness: 1 });
+    const tiers = 3;
+    for (let t = 0; t < tiers; t++) {
+      const cone = new THREE.Mesh(new THREE.ConeGeometry(2.4 - t * 0.6, 2.4, 7), leaf);
+      cone.position.y = trunkH + t * 1.5;
+      g.add(cone);
+    }
+    g.traverse((o) => { o.castShadow = true; });
+    g.position.set(x, y, z);
+    g.scale.setScalar(0.8 + rnd() * 0.8);
+    this.add(g);
+    this.colliders.push({ x, z, r: 0.9 });
+  }
+
+  _buildMine() {
+    const cx = MINE.x, cz = MINE.z;
+    const g = forestHeightAt(cx, cz);
+    const metal = new THREE.MeshStandardMaterial({ color: 0x5a5550, metalness: 0.4, roughness: 0.6 });
+    const wood = new THREE.MeshStandardMaterial({ color: 0x6b4a2b, roughness: 0.9 });
+    const cartMat = new THREE.MeshStandardMaterial({ color: 0x7a4a22, roughness: 0.85 });
+
+    // Pared rocosa con boca de túnel (fondo de la mina)
+    const wall = new THREE.Mesh(new THREE.BoxGeometry(22, 13, 5), new THREE.MeshStandardMaterial({ color: 0x574f47, roughness: 1 }));
+    wall.position.set(cx, forestHeightAt(cx, cz - 11) + 5.5, cz - 11);
+    wall.castShadow = true; wall.receiveShadow = true;
+    this.add(wall);
+    const mouth = new THREE.Mesh(new THREE.BoxGeometry(5, 6, 1), new THREE.MeshBasicMaterial({ color: 0x0a0a0a }));
+    mouth.position.set(cx, g + 3, cz - 8.4);
+    this.add(mouth);
+    this.colliders.push({ x: cx, z: cz - 11, r: 9 });
+
+    // Vigas de madera de la entrada
+    for (const sx of [-2.8, 2.8]) {
+      const beam = new THREE.Mesh(new THREE.BoxGeometry(0.5, 6, 0.5), wood);
+      beam.position.set(cx + sx, g + 3, cz - 8);
+      this.add(beam);
+    }
+    const lintel = new THREE.Mesh(new THREE.BoxGeometry(6.4, 0.6, 0.6), wood);
+    lintel.position.set(cx, g + 6, cz - 8);
+    this.add(lintel);
+
+    // Rieles + durmientes
+    for (const sx of [-0.8, 0.8]) {
+      const rail = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.16, 22), metal);
+      rail.position.set(cx + sx, g + 0.12, cz);
+      rail.castShadow = true;
+      this.add(rail);
+    }
+    for (let zz = cz - 9; zz <= cz + 9; zz += 1.4) {
+      const tie = new THREE.Mesh(new THREE.BoxGeometry(2.4, 0.14, 0.4), wood);
+      tie.position.set(cx, g + 0.05, zz);
+      this.add(tie);
+    }
+
+    // Carrito minero
+    const cart = new THREE.Group();
+    const body = new THREE.Mesh(new THREE.BoxGeometry(2.2, 1.4, 1.7), cartMat);
+    body.position.y = 1.15;
+    cart.add(body);
+    const inner = new THREE.Mesh(new THREE.BoxGeometry(1.9, 1.1, 1.4), new THREE.MeshStandardMaterial({ color: 0x2a1c10 }));
+    inner.position.y = 1.35;
+    cart.add(inner);
+    for (const wx of [-0.9, 0.9]) {
+      for (const wz of [-0.6, 0.6]) {
+        const wheel = new THREE.Mesh(new THREE.CylinderGeometry(0.45, 0.45, 0.2, 12), new THREE.MeshStandardMaterial({ color: 0x2a2724 }));
+        wheel.rotation.z = Math.PI / 2;
+        wheel.position.set(wx, 0.45, wz);
+        cart.add(wheel);
+      }
+    }
+    cart.traverse((o) => { o.castShadow = true; });
+    cart.position.set(cx, g, cz + 2);
+    this.add(cart);
+    this.colliders.push({ x: cx, z: cz + 2, r: 1.7 });
+
+    // Cartel de madera con la inscripción
+    const post = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, 2.6, 6), wood);
+    post.position.set(cx - 5, g + 1.3, cz + 4);
+    this.add(post);
+    const board = new THREE.Mesh(new THREE.BoxGeometry(2.6, 1.3, 0.16), new THREE.MeshStandardMaterial({ color: 0x8a6a3a, roughness: 1 }));
+    board.position.set(cx - 5, g + 2.1, cz + 4);
+    board.rotation.y = 0.35;
+    board.castShadow = true;
+    this.add(board);
+    this._glowMark(cx - 5, g + 3.1, cz + 4, 0xffd27a);
+
+    // Cofre de la Pista 5
+    const chest = this._buildChest(cx + 4, forestHeightAt(cx + 4, cz + 2), cz + 2, 4);
+
+    this.interactables.push({
+      id: 'insc-4', kind: 'inscription', pistaIdx: 4,
+      position: new THREE.Vector3(cx - 5, g + 2, cz + 4), radius: 4.5,
+      prompt: 'Presioná [E] para leer el cartel de la mina',
+    });
+    this.interactables.push({
+      id: 'chest-4', kind: 'chest', pistaIdx: 4,
+      position: chest.position.clone(), radius: 4,
+      prompt: 'Presioná [E] para abrir el cofre',
+    });
+    this.colliders.push({ x: cx - 5, z: cz + 4, r: 0.9 });
+    this.colliders.push({ x: chest.position.x, z: chest.position.z, r: 1.6 });
+  }
 
   update(dt) {
     this._time += dt;

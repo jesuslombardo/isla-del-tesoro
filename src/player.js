@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { PointerLockControls } from '../vendor/PointerLockControls.js';
-import { terrainHeightAt, DROWN_LEVEL, WATER_LEVEL } from './world.js';
+// La altura del terreno y los niveles de agua los provee el mundo actual
+// (this.world.heightAt / waterLevel / drownLevel), para soportar Mundo 1 y 2.
 
 // Controlador de jugador en primera persona.
 // Desktop: WASD + mouse look (PointerLockControls).
@@ -31,8 +32,8 @@ export class Player {
   get object() { return this.controls.getObject(); }
 
   spawn(pos) {
-    const y = terrainHeightAt(pos.x, pos.z);
-    this.object.position.set(pos.x, Math.max(y, WATER_LEVEL) + EYE, pos.z);
+    const y = this.world.heightAt(pos.x, pos.z);
+    this.object.position.set(pos.x, Math.max(y, this.world.waterLevel) + EYE, pos.z);
     this._justRespawned = 1.2; // segundos de gracia tras respawnear
   }
 
@@ -119,13 +120,13 @@ export class Player {
     obj.position.z = nz;
 
     // --- altura del terreno / agua ---
-    const groundH = terrainHeightAt(nx, nz);
-    const floor = Math.max(groundH, WATER_LEVEL - 0.4);
+    const groundH = this.world.heightAt(nx, nz);
+    const floor = Math.max(groundH, this.world.waterLevel - 0.4);
     obj.position.y += (floor + EYE - obj.position.y) * Math.min(1, dt * 12);
 
     // --- peligros ---
     if (this._justRespawned <= 0) {
-      if (groundH < DROWN_LEVEL) {
+      if (groundH < this.world.drownLevel) {
         callbacks.onDanger && callbacks.onDanger('¡Te hundiste en el mar profundo!');
         return;
       }

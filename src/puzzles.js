@@ -104,6 +104,32 @@ export const PISTAS = [
     solvedText:
       '¡El dragón resopla y se aparta! El cofre guarda la última pieza del ' +
       'mapa: un sendero que sube la MONTAÑA hacia el Mundo 2.',
+    nextObjective:
+      'Subí la MONTAÑA y cruzá el portal brillante para pasar al Mundo 2. 🏔️',
+  },
+  {
+    id: 'carrito',
+    num: 5,
+    place: 'la mina',
+    inscription:
+      'Clavado junto a los rieles, un cartel de madera casi borrado dice:\n\n' +
+      '  "Salí del túnel hacia la luz.\n' +
+      '   En el claro del bosque, una sola PALMERA\n' +
+      '   se alza solitaria entre los pinos.\n' +
+      '   A sus pies espera la próxima pista."\n\n' +
+      '(Entre tantos pinos, buscá el único árbol de playa: la palmera.)',
+    question:
+      'Según el cartel de la mina, ¿qué árbol solitario (distinto a los pinos) ' +
+      'marca la próxima pista en el claro?',
+    answers: ['palmera', 'palma', 'la palmera', 'cocotero'],
+    hints: [
+      'No es un pino: es un árbol de playa, alto y con hojas grandes arriba.',
+      'De su copa cuelgan cocos.',
+      'Empieza con "P". Es una palm___.',
+    ],
+    solvedText:
+      '¡El carrito esconde un cofre! Adentro, un mapa del bosque marca una ' +
+      'PALMERA solitaria en un claro entre los pinos.',
     // Última pista implementada por ahora: al resolverla se muestra la victoria.
     nextObjective: null,
   },

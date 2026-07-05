@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { World, SPAWN, CAVE, VOLCANO, LAKE, DRAGON, terrainHeightAt } from './world.js';
+import { World, SPAWN, CAVE, VOLCANO, LAKE, DRAGON, MOUNTAIN, SPAWN2, MINE } from './world.js';
 import { Player } from './player.js';
 import { HUD } from './hud.js';
 import { TouchControls } from './touch.js';
@@ -24,7 +24,7 @@ renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(72, window.innerWidth / window.innerHeight, 0.1, 600);
 
-const world = new World(scene);
+let world = new World(scene);
 const player = new Player(camera, canvas, world);
 player.mobile = IS_TOUCH;
 scene.add(player.object);
@@ -53,7 +53,9 @@ const state = {
   safePos: SPAWN.clone(),
   diamonds: 0, // "plata" que se gana resolviendo pistas
   stars: 0,
+  world: 1, // 1 = isla, 2 = bosque
 };
+const worldOf = (pista) => (pista.num <= 4 ? 1 : 2);
 let hintIdx = 0; // índice de pista/hint mostrada en el acertijo actual
 
 // ---------------------------------------------------------------- interacción
@@ -63,6 +65,7 @@ function handleInteract(it) {
     hud.toast('Todavía no es momento para esto. Seguí la pista actual.');
     return;
   }
+  if (it.kind === 'portal') { enterMundo2(); return; }
   const pista = PISTAS[it.pistaIdx];
   if (it.kind === 'inscription') {
     state.read[it.pistaIdx] = true;
@@ -111,13 +114,34 @@ function onPistaSolved(pista, idx) {
     hud.showWin(pista.solvedText);
     return;
   }
-  // Avanza a la próxima pista: muestra el botín y actualiza el objetivo.
+  // Avanza a la próxima pista.
+  const next = PISTAS[idx + 1];
   state.currentPista = idx + 1;
-  world.showBeacon(idx + 1);
+  if (worldOf(next) !== worldOf(pista)) {
+    // Cruce de mundo: se enciende el portal de la montaña (no la baliza de la
+    // próxima pista, que está en el otro mundo).
+    world.showPortalBeacon();
+  } else {
+    world.showBeacon(idx + 1);
+  }
   hud.setObjective(pista.nextObjective);
   // Sustituye el acertijo por el pergamino del botín (el modal sigue abierto).
   hud.hideRiddle();
   hud.showClue(pista.solvedText + '\n\n➡ ' + pista.nextObjective);
+}
+
+// Cruzar el portal de la montaña: cambia todo el escenario al Mundo 2 (bosque).
+function enterMundo2() {
+  hud.toast('🌲 Entrando al Mundo 2...');
+  world.dispose();
+  world = new World(scene, 'bosque');
+  player.world = world;
+  state.world = 2;
+  player.spawn(SPAWN2);
+  player.lookAt(MINE);
+  state.safePos.copy(SPAWN2);
+  lastStepX = SPAWN2.x; lastStepZ = SPAWN2.z;
+  hud.setObjective('Estás en el bosque (Mundo 2). Buscá el CARRITO MINERO (seguí el haz de luz).');
 }
 
 function showRiddleHint(pista) {
@@ -238,9 +262,27 @@ function showApp(name) {
       `<p>Ganás <b>diamantes</b> y <b>estrellas</b> resolviendo pistas.</p>` +
       `<p style="font-size:13px;margin-top:10px">Pronto vas a poder gastarlos en la tienda de personajes y fondos.</p>`;
   } else if (name === 'mapa') {
-    phoneAppTitle.textContent = '🗺️ Mapa · Mundo 1';
-    phoneAppBody.innerHTML = buildMapSVG();
+    phoneAppTitle.textContent = state.world === 2 ? '🗺️ Mapa · Mundo 2' : '🗺️ Mapa · Mundo 1';
+    phoneAppBody.innerHTML = state.world === 2 ? buildMapSVG2() : buildMapSVG();
   }
+}
+
+function buildMapSVG2() {
+  const done = state.solved[4];
+  const cur = state.currentPista === 4;
+  const ring = done ? '#2e7d32' : cur ? '#e8a91b' : '#ffffff';
+  let pines = '';
+  const seedPts = [[40, 60], [170, 50], [55, 150], [180, 160], [90, 40], [150, 120], [30, 110]];
+  for (const [px, py] of seedPts) pines += `<text x="${px}" y="${py}" font-size="18" text-anchor="middle">🌲</text>`;
+  return `<svg class="map-svg" viewBox="0 0 220 220" xmlns="http://www.w3.org/2000/svg">
+    <rect width="220" height="220" rx="12" fill="#24352b"/>
+    ${pines}
+    <circle cx="110" cy="95" r="12" fill="rgba(255,255,255,.92)" stroke="${ring}" stroke-width="3"/>
+    <text x="110" y="100" font-size="13" text-anchor="middle">⛏️</text>
+  </svg><div class="map-legend">
+    <div>⛏️ Mina / carrito ${done ? '✅' : cur ? '⟵ estás acá' : ''}</div>
+    <div style="opacity:.7">🌴 Palmera · 🏚️ Casa · 🏰 Castillo (próximamente)</div>
+  </div>`;
 }
 
 function buildMapSVG() {
@@ -372,7 +414,7 @@ function checkCollectibles() {
 // Último punto seguro (para respawnear tras un peligro)
 function updateSafePos() {
   const p = player.object.position;
-  if (terrainHeightAt(p.x, p.z) < 1.3) return;
+  if (world.heightAt(p.x, p.z) < 1.3) return;
   for (const tr of world.traps) {
     if (Math.hypot(p.x - tr.x, p.z - tr.z) < tr.r + 2) return;
   }
@@ -406,12 +448,14 @@ function animate() {
 }
 animate();
 
-// Debug/pruebas
+// Debug/pruebas (world es un getter porque cambia al pasar de mundo)
 window.__isla = {
-  state, world, player, PISTAS,
+  state, player, PISTAS,
+  get world() { return world; },
   interact: (id) => {
     const it = world.interactables.find((i) => i.id === id);
     if (it) handleInteract(it);
   },
   checkCollectibles,
+  enterMundo2,
 };
