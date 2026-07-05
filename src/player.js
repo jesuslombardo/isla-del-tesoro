@@ -111,9 +111,9 @@ export class Player {
 
     // --- límite del mundo ---
     const worldR = Math.hypot(nx, nz);
-    if (worldR > 150) {
-      nx = (nx / worldR) * 150;
-      nz = (nz / worldR) * 150;
+    if (worldR > 185) {
+      nx = (nx / worldR) * 185;
+      nz = (nz / worldR) * 185;
     }
 
     obj.position.x = nx;

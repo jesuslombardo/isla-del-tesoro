@@ -38,7 +38,7 @@ export function forestHeightAt(x, z) {
 // --- Altura del terreno: isla como montículo radial con colinas suaves --------
 export function terrainHeightAt(x, z) {
   const r = Math.hypot(x, z);
-  const R = 96;
+  const R = 118; // radio de la isla (más grande)
   const t = Math.min(r / R, 1);
   const base = Math.cos(t * Math.PI * 0.5); // 1 en el centro -> 0 en el borde
   let h = base * 14 - 4; // centro ~10, borde ~-4 (bajo el agua)
@@ -113,6 +113,8 @@ export class World {
     this._scatterVegetation();
     this._scatterCollectibles(); // monedas y estrellas para juntar
     this._scatterAnimals(); // animalitos que dan +1 vida si los cazás
+    this._buildSeagulls(); // gaviotas volando
+    this._buildClouds(); // nubes
 
     // Balizas: la de la cueva visible; las demás aparecen al resolver la anterior
     this._buildBeacon(0, CAVE, 0xffe08a, true);
@@ -165,8 +167,8 @@ export class World {
 
   // ------------------------------------------------------------------ terreno
   _buildTerrain() {
-    const size = 320;
-    const seg = 220;
+    const size = 420;
+    const seg = 260;
     const geo = new THREE.PlaneGeometry(size, size, seg, seg);
     geo.rotateX(-Math.PI / 2);
     const pos = geo.attributes.position;
@@ -861,22 +863,73 @@ export class World {
       seed = (seed * 16807) % 2147483647;
       return seed / 2147483647;
     };
-    for (let i = 0; i < 90; i++) {
+    const blocked = (x, z) =>
+      Math.hypot(x - CAVE.x, z - CAVE.z) < 12 ||
+      Math.hypot(x - VOLCANO.x, z - VOLCANO.z) < 22 ||
+      Math.hypot(x - SHRINE.x, z - SHRINE.z) < 11 ||
+      Math.hypot(x - LAKE.x, z - LAKE.z) < LAKE_R + 5 ||
+      Math.hypot(x - DRAGON.x, z - DRAGON.z) < 18 ||
+      Math.hypot(x - MOUNTAIN.x, z - MOUNTAIN.z) < 16 ||
+      Math.hypot(x - SPAWN.x, z - SPAWN.z) < 9;
+    // Isla más grande y frondosa: muchas más plantas repartidas.
+    for (let i = 0; i < 420; i++) {
       const ang = rnd() * Math.PI * 2;
-      const rad = 8 + rnd() * 82;
+      const rad = 8 + rnd() * 106;
       const x = Math.cos(ang) * rad;
       const z = Math.sin(ang) * rad;
       const h = terrainHeightAt(x, z);
-      if (h < 1 || h > 9) continue;
-      if (Math.hypot(x - CAVE.x, z - CAVE.z) < 12) continue;
-      if (Math.hypot(x - VOLCANO.x, z - VOLCANO.z) < 22) continue;
-      if (Math.hypot(x - SHRINE.x, z - SHRINE.z) < 11) continue;
-      if (Math.hypot(x - LAKE.x, z - LAKE.z) < LAKE_R + 5) continue;
-      if (Math.hypot(x - DRAGON.x, z - DRAGON.z) < 18) continue;
-      if (Math.hypot(x - SPAWN.x, z - SPAWN.z) < 10) continue;
-      if (rnd() < 0.6) this._palm(x, h, z, rnd);
-      else this._rock(x, h, z, rnd);
+      if (h < 0.8 || h > 11) continue;
+      if (blocked(x, z)) continue;
+      const r = rnd();
+      if (r < 0.24) this._palm(x, h, z, rnd);
+      else if (r < 0.42) this._rock(x, h, z, rnd);
+      else if (r < 0.66) this._bush(x, h, z, rnd);
+      else if (r < 0.88) this._grassTuft(x, h, z, rnd);
+      else this._flower(x, h, z, rnd);
     }
+  }
+
+  _bush(x, y, z, rnd) {
+    const g = new THREE.Group();
+    const mat = new THREE.MeshStandardMaterial({ color: rnd() < 0.5 ? 0x3f7d38 : 0x4f8a3a, roughness: 1 });
+    const n = 3 + Math.floor(rnd() * 3);
+    for (let i = 0; i < n; i++) {
+      const s = 0.5 + rnd() * 0.5;
+      const blob = new THREE.Mesh(new THREE.SphereGeometry(s, 7, 6), mat);
+      blob.position.set((rnd() - 0.5) * 1.1, s * 0.7, (rnd() - 0.5) * 1.1);
+      blob.castShadow = true;
+      g.add(blob);
+    }
+    g.position.set(x, y, z);
+    this.add(g);
+  }
+
+  _grassTuft(x, y, z, rnd) {
+    const g = new THREE.Group();
+    const mat = new THREE.MeshStandardMaterial({ color: 0x6fae3f, roughness: 1, side: THREE.DoubleSide });
+    const n = 4 + Math.floor(rnd() * 4);
+    for (let i = 0; i < n; i++) {
+      const blade = new THREE.Mesh(new THREE.ConeGeometry(0.06, 0.5 + rnd() * 0.4, 3), mat);
+      const a = rnd() * Math.PI * 2;
+      blade.position.set(Math.cos(a) * 0.2, 0.3, Math.sin(a) * 0.2);
+      blade.rotation.z = (rnd() - 0.5) * 0.4;
+      g.add(blade);
+    }
+    g.position.set(x, y, z);
+    this.add(g);
+  }
+
+  _flower(x, y, z, rnd) {
+    const g = new THREE.Group();
+    const stem = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.6, 4), new THREE.MeshStandardMaterial({ color: 0x4f8a3a }));
+    stem.position.y = 0.3;
+    g.add(stem);
+    const colors = [0xe8556d, 0xf4c95d, 0xe86ba8, 0xffffff, 0xff8a3a];
+    const petals = new THREE.Mesh(new THREE.SphereGeometry(0.14, 7, 6), new THREE.MeshStandardMaterial({ color: colors[Math.floor(rnd() * colors.length)], roughness: 0.7 }));
+    petals.position.y = 0.62; petals.scale.y = 0.6;
+    g.add(petals);
+    g.position.set(x, y, z);
+    this.add(g);
   }
 
   _palm(x, y, z, rnd) {
@@ -932,7 +985,7 @@ export class World {
     const place = (type) => {
       for (let tries = 0; tries < 30; tries++) {
         const ang = rnd() * Math.PI * 2;
-        const rad = 14 + rnd() * 74;
+        const rad = 14 + rnd() * 98;
         const x = Math.cos(ang) * rad;
         const z = Math.sin(ang) * rad;
         const h = terrainHeightAt(x, z);
@@ -966,8 +1019,8 @@ export class World {
       }
     };
 
-    for (let i = 0; i < 20; i++) place('coin');
-    for (let i = 0; i < 6; i++) place('star');
+    for (let i = 0; i < 26; i++) place('coin');
+    for (let i = 0; i < 8; i++) place('star');
   }
 
   _starGeo() {
@@ -985,16 +1038,77 @@ export class World {
     return this._starGeoCache;
   }
 
+  // --------------------------------------------------------- gaviotas y nubes
+  _buildSeagulls() {
+    const wingMat = new THREE.MeshStandardMaterial({ color: 0xf4f4f0, roughness: 1, side: THREE.DoubleSide });
+    const bodyMat = new THREE.MeshStandardMaterial({ color: 0xdedcd4, roughness: 1 });
+    const gulls = [];
+    for (let i = 0; i < 8; i++) {
+      const g = new THREE.Group();
+      const body = new THREE.Mesh(new THREE.SphereGeometry(0.28, 6, 5), bodyMat);
+      body.scale.set(1, 0.7, 1.8);
+      g.add(body);
+      const wl = new THREE.Mesh(new THREE.PlaneGeometry(2.4, 0.8), wingMat);
+      wl.position.x = -1.2;
+      g.add(wl);
+      const wr = new THREE.Mesh(new THREE.PlaneGeometry(2.4, 0.8), wingMat);
+      wr.position.x = 1.2;
+      g.add(wr);
+      g.userData = { r: 45 + i * 9, base: (i / 8) * Math.PI * 2, h: 46 + (i % 3) * 6, spd: 0.06 + (i % 4) * 0.015, ph: i, wl, wr };
+      this.add(g);
+      gulls.push(g);
+    }
+    this._animated.push((t) => {
+      for (const g of gulls) {
+        const u = g.userData;
+        const a = u.base + t * u.spd;
+        g.position.set(Math.cos(a) * u.r, u.h + Math.sin(t * 0.5 + u.ph) * 2, Math.sin(a) * u.r);
+        g.rotation.y = -a;
+        const flap = Math.sin(t * 5 + u.ph) * 0.5;
+        u.wl.rotation.z = 0.35 + flap;
+        u.wr.rotation.z = -0.35 - flap;
+      }
+    });
+  }
+
+  _buildClouds() {
+    const mat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 1, transparent: true, opacity: 0.9 });
+    let seed = 77;
+    const rnd = () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647; };
+    const clouds = [];
+    for (let i = 0; i < 6; i++) {
+      const c = new THREE.Group();
+      const n = 4 + Math.floor(rnd() * 3);
+      for (let k = 0; k < n; k++) {
+        const s = 4 + rnd() * 5;
+        const puff = new THREE.Mesh(new THREE.SphereGeometry(s, 7, 6), mat);
+        puff.position.set((rnd() - 0.5) * 16, (rnd() - 0.5) * 3, (rnd() - 0.5) * 10);
+        puff.scale.y = 0.6;
+        c.add(puff);
+      }
+      c.position.set((rnd() - 0.5) * 260, 70 + rnd() * 20, (rnd() - 0.5) * 260);
+      c.userData = { spd: 0.4 + rnd() * 0.5 };
+      this.add(c);
+      clouds.push(c);
+    }
+    this._animated.push((t) => {
+      for (const c of clouds) {
+        c.position.x += c.userData.spd * 0.02;
+        if (c.position.x > 200) c.position.x = -200;
+      }
+    });
+  }
+
   // --------------------------------------------- animalitos (dan +1 vida al cazar)
   _scatterAnimals() {
     this.animals = [];
     let seed = 555;
     const rnd = () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647; };
     let placed = 0, tries = 0;
-    while (placed < 6 && tries < 200) {
+    while (placed < 9 && tries < 260) {
       tries++;
       const ang = rnd() * Math.PI * 2;
-      const rad = 16 + rnd() * 66;
+      const rad = 16 + rnd() * 92;
       const x = Math.cos(ang) * rad, z = Math.sin(ang) * rad;
       const h = terrainHeightAt(x, z);
       if (h < 1.6 || h > 8) continue;
