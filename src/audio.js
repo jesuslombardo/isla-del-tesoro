@@ -41,23 +41,51 @@ export class GameAudio {
     const sea = this.ctx.createBufferSource();
     sea.buffer = this._noise; sea.loop = true;
     const lp = this.ctx.createBiquadFilter();
-    lp.type = 'lowpass'; lp.frequency.value = 420;
-    const seaG = this.ctx.createGain(); seaG.gain.value = 0.10;
+    lp.type = 'lowpass'; lp.frequency.value = 440;
+    const seaG = this.ctx.createGain(); seaG.gain.value = 0.16;
     sea.connect(lp); lp.connect(seaG); seaG.connect(this.master); sea.start();
 
-    // Capa de olas (bandpass con vaivén lento)
+    // Capa de olas / oleaje (bandpass con vaivén lento)
     const waves = this.ctx.createBufferSource();
     waves.buffer = this._noise; waves.loop = true;
     const bp = this.ctx.createBiquadFilter();
-    bp.type = 'bandpass'; bp.frequency.value = 900; bp.Q.value = 0.7;
-    const wavesG = this.ctx.createGain(); wavesG.gain.value = 0.03;
-    const lfo = this.ctx.createOscillator(); lfo.frequency.value = 0.12;
-    const lfoG = this.ctx.createGain(); lfoG.gain.value = 0.028;
+    bp.type = 'bandpass'; bp.frequency.value = 850; bp.Q.value = 0.6;
+    const wavesG = this.ctx.createGain(); wavesG.gain.value = 0.05;
+    const lfo = this.ctx.createOscillator(); lfo.frequency.value = 0.13;
+    const lfoG = this.ctx.createGain(); lfoG.gain.value = 0.05;
     lfo.connect(lfoG); lfoG.connect(wavesG.gain);
     waves.connect(bp); bp.connect(wavesG); wavesG.connect(this.master);
     waves.start(); lfo.start();
 
     this._scheduleBird();
+    this._scheduleGull();
+  }
+
+  _scheduleGull() {
+    const delay = 5000 + Math.random() * 9000;
+    this._gullTimer = setTimeout(() => { this.seagull(); this._scheduleGull(); }, delay);
+  }
+
+  // Graznido de gaviota: 2-3 chillidos nasales que bajan de tono.
+  seagull() {
+    if (!this.ctx || this.muted) return;
+    const calls = 2 + Math.floor(Math.random() * 2);
+    let start = this.ctx.currentTime + 0.02;
+    for (let i = 0; i < calls; i++) {
+      const o = this.ctx.createOscillator(); o.type = 'sawtooth';
+      const f0 = 1150 - i * 90;
+      o.frequency.setValueAtTime(f0, start);
+      o.frequency.exponentialRampToValueAtTime(f0 * 0.5, start + 0.17);
+      o.frequency.exponentialRampToValueAtTime(f0 * 0.72, start + 0.24);
+      const bpf = this.ctx.createBiquadFilter(); bpf.type = 'bandpass'; bpf.frequency.value = 1500; bpf.Q.value = 3;
+      const g = this.ctx.createGain();
+      g.gain.setValueAtTime(0.0001, start);
+      g.gain.exponentialRampToValueAtTime(0.06, start + 0.03);
+      g.gain.exponentialRampToValueAtTime(0.0001, start + 0.26);
+      o.connect(bpf); bpf.connect(g); g.connect(this.master);
+      o.start(start); o.stop(start + 0.28);
+      start += 0.34 + Math.random() * 0.12;
+    }
   }
 
   _scheduleBird() {
@@ -96,10 +124,10 @@ export class GameAudio {
     bp.type = 'bandpass'; bp.frequency.value = 320 + Math.random() * 140; bp.Q.value = 1.1;
     const g = this.ctx.createGain();
     g.gain.setValueAtTime(0.0001, t);
-    g.gain.exponentialRampToValueAtTime(0.14, t + 0.005);
-    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.11);
+    g.gain.exponentialRampToValueAtTime(0.22, t + 0.005);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.12);
     src.connect(bp); bp.connect(g); g.connect(this.master);
-    src.start(t, Math.random() * 1.4, 0.13); src.stop(t + 0.13);
+    src.start(t, Math.random() * 1.4, 0.14); src.stop(t + 0.14);
   }
 
   // Abrir cofre: crujido de madera + campanita de recompensa.

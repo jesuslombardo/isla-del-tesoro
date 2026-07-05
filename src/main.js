@@ -184,6 +184,12 @@ if (IS_TOUCH) {
 }
 
 hud.el.startBtn.addEventListener('click', startGame);
+
+// Desbloqueo de audio en celular: cualquier toque/click reactiva el contexto
+// (iOS/Android exigen un gesto del usuario para que suene).
+function unlockAudio() { audio.init(); audio.resume(); }
+window.addEventListener('pointerdown', unlockAudio);
+window.addEventListener('touchend', unlockAudio);
 // Botón de acción táctil: interactúa con lo que esté en rango
 actionBtn.addEventListener('click', () => {
   if (state.active && !state.modalOpen) handleInteract(state.active);
