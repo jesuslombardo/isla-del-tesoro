@@ -28,6 +28,9 @@ jobs:
 
       - name: Configurar Pages
         uses: actions/configure-pages@v5
+        with:
+          # Habilita Pages automáticamente si aún no lo está (usa el token del workflow).
+          enablement: true
 
       - name: Subir artefacto del sitio
         uses: actions/upload-pages-artifact@v3
