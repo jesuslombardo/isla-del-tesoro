@@ -17,6 +17,7 @@ export const VOLCANO = new THREE.Vector3(48, 0, -46); // Pista 2 (cono)
 export const SHRINE = new THREE.Vector3(32, 0, -31); // altar de Pista 2 (accesible)
 export const LAKE = new THREE.Vector3(-8, 0, 30); // Pista 3 (lago)
 const LAKE_R = 7; // radio del espejo de agua
+export const DRAGON = new THREE.Vector3(-52, 0, -8); // Pista 4 (guarida del dragón)
 
 // --- Altura del terreno: isla como montículo radial con colinas suaves --------
 export function terrainHeightAt(x, z) {
@@ -60,12 +61,14 @@ export class World {
     this._buildVolcano(); // cono decorativo + colisión
     this._buildVolcanoShrine(); // Pista 2 (altar accesible)
     this._buildLake(); // Pista 3 (lago)
+    this._buildDragon(); // Pista 4 (dragón)
     this._scatterVegetation();
 
     // Balizas: la de la cueva visible; las demás aparecen al resolver la anterior
     this._buildBeacon(0, CAVE, 0xffe08a, true);
     this._buildBeacon(1, SHRINE, 0xff9a5a, false);
     this._buildBeacon(2, LAKE, 0x7ad0ff, false);
+    this._buildBeacon(3, DRAGON, 0x8fe36a, false);
   }
 
   // --------------------------------------------------------------- cielo / luz
@@ -476,6 +479,183 @@ export class World {
     this.colliders.push({ x: chx, z: chz, r: 1.6 });
   }
 
+  // ----------------------------------------------------------- dragón (P4)
+  _buildDragon() {
+    const cx = DRAGON.x;
+    const cz = DRAGON.z;
+    const ground = terrainHeightAt(cx, cz);
+
+    const green = new THREE.MeshStandardMaterial({ color: 0x4a7a3a, roughness: 0.9 });
+    const greenDark = new THREE.MeshStandardMaterial({ color: 0x35592a, roughness: 1 });
+    const belly = new THREE.MeshStandardMaterial({ color: 0x7fae52, roughness: 1 });
+    const claw = new THREE.MeshStandardMaterial({ color: 0x2a2320, roughness: 1 });
+    const wingMat = new THREE.MeshStandardMaterial({ color: 0x3f6b32, roughness: 1, side: THREE.DoubleSide });
+
+    // Grupo del dragón: mira hacia +X (de donde llega el jugador)
+    const d = new THREE.Group();
+    d.position.set(cx, ground, cz);
+    this.scene.add(d);
+
+    // Cuerpo (elipsoide)
+    const body = new THREE.Mesh(new THREE.SphereGeometry(2, 18, 14), green);
+    body.scale.set(2.0, 1.3, 1.4);
+    body.position.set(0, 2, 0);
+    d.add(body);
+    const bellyMesh = new THREE.Mesh(new THREE.SphereGeometry(1.9, 16, 12), belly);
+    bellyMesh.scale.set(1.7, 1.0, 1.2);
+    bellyMesh.position.set(0.2, 1.5, 0);
+    d.add(bellyMesh);
+
+    // Patas
+    for (const [lx, lz] of [[1.4, 1.0], [1.4, -1.0], [-1.3, 1.0], [-1.3, -1.0]]) {
+      const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.5, 2, 8), green);
+      leg.position.set(lx, 1, lz);
+      d.add(leg);
+      const foot = new THREE.Mesh(new THREE.SphereGeometry(0.55, 8, 6), greenDark);
+      foot.position.set(lx + 0.2, 0.2, lz);
+      d.add(foot);
+    }
+
+    // Cola (cono hacia -X)
+    const tail = new THREE.Mesh(new THREE.ConeGeometry(0.9, 6, 8), green);
+    tail.rotation.z = Math.PI / 2;
+    tail.position.set(-4.4, 1.8, 0);
+    d.add(tail);
+
+    // Cuello + cabeza (mira a +X, arriba)
+    const neck = new THREE.Mesh(new THREE.CylinderGeometry(0.7, 1.0, 3.2, 10), green);
+    neck.position.set(2.3, 3.1, 0);
+    neck.rotation.z = -0.9;
+    d.add(neck);
+    const head = new THREE.Mesh(new THREE.BoxGeometry(1.8, 1.2, 1.2), green);
+    head.position.set(3.7, 3.7, 0);
+    d.add(head);
+    const snout = new THREE.Mesh(new THREE.BoxGeometry(1.0, 0.7, 0.9), green);
+    snout.position.set(4.6, 3.5, 0);
+    d.add(snout);
+    // Boca (interior rojo)
+    const mouth = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.5, 0.8), new THREE.MeshBasicMaterial({ color: 0x8a1010 }));
+    mouth.position.set(5.05, 3.4, 0);
+    d.add(mouth);
+    // Ojos
+    for (const s of [1, -1]) {
+      const eye = new THREE.Mesh(new THREE.SphereGeometry(0.22, 8, 8), new THREE.MeshBasicMaterial({ color: 0xffe000 }));
+      eye.position.set(4.0, 4.1, 0.5 * s);
+      d.add(eye);
+      const pupil = new THREE.Mesh(new THREE.SphereGeometry(0.1, 6, 6), new THREE.MeshBasicMaterial({ color: 0x000000 }));
+      pupil.position.set(4.18, 4.1, 0.5 * s);
+      d.add(pupil);
+      // Cuernos
+      const horn = new THREE.Mesh(new THREE.ConeGeometry(0.18, 1, 6), claw);
+      horn.position.set(3.3, 4.6, 0.4 * s);
+      horn.rotation.z = 0.5;
+      d.add(horn);
+    }
+
+    // Púas en el lomo
+    for (let i = 0; i < 7; i++) {
+      const spike = new THREE.Mesh(new THREE.ConeGeometry(0.28, 0.9, 5), greenDark);
+      spike.position.set(2.0 - i * 0.9, 3.2 - Math.abs(i - 3) * 0.12, 0);
+      d.add(spike);
+    }
+
+    // Alas (membranas que se abren hacia arriba y aletean)
+    const wingL = new THREE.Mesh(new THREE.PlaneGeometry(4, 2.6), wingMat);
+    wingL.position.set(-0.6, 3.6, 1.2);
+    wingL.rotation.set(0.5, 0.3, 1.0);
+    d.add(wingL);
+    const wingR = new THREE.Mesh(new THREE.PlaneGeometry(4, 2.6), wingMat);
+    wingR.position.set(-0.6, 3.6, -1.2);
+    wingR.rotation.set(-0.5, -0.3, 1.0);
+    d.add(wingR);
+
+    d.traverse((o) => { o.castShadow = true; });
+
+    // Tesoro (montón de oro) + placa con la inscripción, al costado sur
+    const hoardX = cx - 4;
+    const hoardZ = cz - 12;
+    const gold = new THREE.MeshStandardMaterial({ color: 0xf4c95d, metalness: 0.7, roughness: 0.35 });
+    const hoard = new THREE.Mesh(new THREE.SphereGeometry(2.2, 12, 8, 0, Math.PI * 2, 0, Math.PI / 2), gold);
+    hoard.position.set(hoardX, terrainHeightAt(hoardX, hoardZ), hoardZ);
+    hoard.scale.set(1.4, 0.5, 1.4);
+    hoard.castShadow = true;
+    this.scene.add(hoard);
+    const plaque = new THREE.Mesh(new THREE.BoxGeometry(2.4, 1.8, 0.4), gold);
+    const pg = terrainHeightAt(hoardX, hoardZ);
+    plaque.position.set(hoardX, pg + 1.4, hoardZ);
+    plaque.rotation.set(-0.25, 0.3, 0);
+    plaque.castShadow = true;
+    this.scene.add(plaque);
+    this._glowMark(hoardX, pg + 2.8, hoardZ, 0xffe08a);
+
+    // Cofre de la Pista 4 (al costado sur, para llegar rodeando el fuego)
+    const chz = cz - 12;
+    const chx = cx;
+    const chest = this._buildChest(chx, terrainHeightAt(chx, chz), chz, 3);
+
+    // --- Fuego: sale de la boca hacia +X, por ciclos ---
+    const mouthX = cx + 5.2;
+    const mouthY = ground + 3.4;
+    const mouthZ = cz;
+    const fireGroup = new THREE.Group();
+    fireGroup.position.set(mouthX, mouthY, mouthZ);
+    this.scene.add(fireGroup);
+    const fireColors = [0xffe23a, 0xffa020, 0xff5a10, 0xff2a05];
+    for (let i = 0; i < 4; i++) {
+      const flame = new THREE.Mesh(
+        new THREE.ConeGeometry(0.55 + i * 0.3, 1.8, 8),
+        new THREE.MeshBasicMaterial({ color: fireColors[i], transparent: true, opacity: 0.85 })
+      );
+      flame.rotation.z = -Math.PI / 2; // apunta a +X
+      flame.position.set(1 + i * 1.25, 0, 0);
+      fireGroup.add(flame);
+    }
+    const fireLight = new THREE.PointLight(0xff5a10, 0, 30, 2);
+    fireLight.position.set(mouthX + 3, mouthY, mouthZ);
+    this.scene.add(fireLight);
+
+    // Zona de peligro del fuego (trampa que se activa solo en la ráfaga)
+    const fireTrap = { x: mouthX + 3, z: mouthZ, r: 4.6, active: false, msg: '¡El dragón te quemó con su fuego! 🔥' };
+    this.traps.push(fireTrap);
+
+    // Colisión del cuerpo del dragón
+    this.colliders.push({ x: cx, z: cz, r: 3.2 });
+    this.colliders.push({ x: chx, z: chz, r: 1.6 });
+
+    // Interactuables de la Pista 4
+    this.interactables.push({
+      id: 'insc-3', kind: 'inscription', pistaIdx: 3,
+      position: new THREE.Vector3(hoardX, pg + 1.4, hoardZ), radius: 4.5,
+      prompt: 'Presioná [E] para leer la placa de oro',
+    });
+    this.interactables.push({
+      id: 'chest-3', kind: 'chest', pistaIdx: 3,
+      position: chest.position.clone(), radius: 4,
+      prompt: 'Presioná [E] para abrir el cofre',
+    });
+
+    // Animación: idle + aleteo + ciclo de fuego
+    const CYCLE = 6;
+    this._animated.push((t) => {
+      d.position.y = ground + Math.sin(t * 1.2) * 0.12;
+      const flap = Math.sin(t * 2.2) * 0.18;
+      wingL.rotation.z = 1.0 + flap;
+      wingR.rotation.z = 1.0 + flap;
+      head.rotation.z = Math.sin(t * 0.8) * 0.05;
+
+      const c = t % CYCLE;
+      let f = 0, active = false;
+      if (c > 3.8 && c < 4.6) f = ((c - 3.8) / 0.8) * 0.45; // preparación
+      else if (c >= 4.6 && c < 5.8) { f = 1; active = true; } // ráfaga
+      else if (c >= 5.8 && c < 6.0) f = (6.0 - c) / 0.2; // se apaga
+      const flick = 0.82 + Math.sin(t * 28) * 0.18;
+      fireGroup.visible = f > 0.01;
+      fireGroup.scale.setScalar(Math.max(0.001, f * flick));
+      fireLight.intensity = f > 0 ? 5 * f * flick : 0;
+      fireTrap.active = active;
+    });
+  }
+
   // ------------------------------------------------------------------- cofre
   _buildChest(x, ground, z, idx) {
     const g = new THREE.Group();
@@ -559,6 +739,7 @@ export class World {
       if (Math.hypot(x - VOLCANO.x, z - VOLCANO.z) < 22) continue;
       if (Math.hypot(x - SHRINE.x, z - SHRINE.z) < 11) continue;
       if (Math.hypot(x - LAKE.x, z - LAKE.z) < LAKE_R + 5) continue;
+      if (Math.hypot(x - DRAGON.x, z - DRAGON.z) < 18) continue;
       if (Math.hypot(x - SPAWN.x, z - SPAWN.z) < 10) continue;
       if (rnd() < 0.6) this._palm(x, h, z, rnd);
       else this._rock(x, h, z, rnd);

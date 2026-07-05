@@ -77,6 +77,33 @@ export const PISTAS = [
     solvedText:
       '¡El tercer cofre se abre! El mapa ahora arde en los bordes: marca la ' +
       'guarida del DRAGÓN, el guardián del paso hacia el Mundo 2.',
+    nextObjective:
+      'Cruzá la isla hasta la guarida del DRAGÓN y buscá su tesoro. ' +
+      '⚠️ ¡Cuidado con su fuego! Rodealo para llegar al cofre.',
+  },
+  {
+    id: 'dragon',
+    num: 4,
+    place: 'la guarida del dragón',
+    inscription:
+      'Entre huesos y monedas, una placa de oro derretida dice:\n\n' +
+      '  "Yo guardo el fuego, pero no el camino.\n' +
+      '   El otro mundo no está bajo tierra ni en el mar:\n' +
+      '   está ARRIBA. Trepá lo más alto de la isla\n' +
+      '   y cruzarás al otro lado."\n\n' +
+      '(¿Cuál es el punto más alto que se sube para pasar al Mundo 2?)',
+    question:
+      'Según la placa del dragón, para cruzar al Mundo 2 hay que trepar ' +
+      'lo más alto de la isla. ¿Qué hay que subir?',
+    answers: ['montana', 'la montana', 'montaña', 'cima', 'cumbre', 'cerro'],
+    hints: [
+      'No es bajo tierra ni en el agua: hay que ir hacia ARRIBA.',
+      'Es la parte más alta de la isla, que se trepa.',
+      'Empieza con "M". Es una monta__.',
+    ],
+    solvedText:
+      '¡El dragón resopla y se aparta! El cofre guarda la última pieza del ' +
+      'mapa: un sendero que sube la MONTAÑA hacia el Mundo 2.',
     // Última pista implementada por ahora: al resolverla se muestra la victoria.
     nextObjective: null,
   },

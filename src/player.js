@@ -130,8 +130,9 @@ export class Player {
         return;
       }
       for (const tr of this.world.traps) {
+        if (tr.active === false) continue; // peligro desactivado (ej: fuego apagado)
         if (Math.hypot(nx - tr.x, nz - tr.z) < tr.r) {
-          callbacks.onDanger && callbacks.onDanger('¡Caíste en un pozo trampa!');
+          callbacks.onDanger && callbacks.onDanger(tr.msg || '¡Caíste en un pozo trampa!');
           return;
         }
       }
