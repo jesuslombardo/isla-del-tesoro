@@ -3,6 +3,7 @@ import { World, SPAWN, CAVE, terrainHeightAt } from './world.js';
 import { Player } from './player.js';
 import { HUD } from './hud.js';
 import { TouchControls } from './touch.js';
+import { GameAudio } from './audio.js';
 import { PISTAS, isCorrect } from './puzzles.js';
 
 // Detección de dispositivo táctil (celular/tablet)
@@ -30,6 +31,7 @@ scene.add(player.object);
 
 const hud = new HUD();
 const touch = IS_TOUCH ? new TouchControls(player) : null;
+const audio = new GameAudio();
 const actionBtn = document.getElementById('action-btn');
 
 // ¿El juego está aceptando input ahora mismo?
@@ -49,6 +51,8 @@ const state = {
   modalOpen: false,
   active: null,
   safePos: SPAWN.clone(),
+  diamonds: 0, // "plata" que se gana resolviendo pistas
+  stars: 0,
 };
 let hintIdx = 0; // índice de pista/hint mostrada en el acertijo actual
 
@@ -87,6 +91,11 @@ function submitRiddle(pista, idx) {
   state.solved[idx] = true;
   world.openChest(idx);
   world.hideBeacon(idx);
+  audio.chestOpen();
+  // Recompensa: diamantes + una estrella por pista resuelta
+  state.diamonds += 30;
+  state.stars += 1;
+  hud.toast('🏆 +30 💎  +1 ⭐');
   setTimeout(() => onPistaSolved(pista, idx), 900);
 }
 
@@ -155,6 +164,9 @@ function startGame() {
   player.enabled = true;
   player.spawn(SPAWN);
   player.lookAt(CAVE);
+  audio.init();
+  audio.resume();
+  audio.startAmbient();
   if (player.mobile) touch.enable();
   else player.controls.lock();
 }
@@ -175,7 +187,16 @@ actionBtn.addEventListener('click', () => {
 });
 hud.el.resumeBtn.addEventListener('click', () => {
   hud.hideResume();
+  audio.resume();
   player.controls.lock();
+});
+
+// Botón de sonido (mute / unmute)
+const soundBtn = document.getElementById('sound-btn');
+soundBtn.addEventListener('click', () => {
+  const m = !audio.muted;
+  audio.setMuted(m);
+  soundBtn.textContent = m ? '🔇' : '🔊';
 });
 hud.el.clueClose.addEventListener('click', () => closeModal(() => hud.hideClue()));
 hud.el.riddleSubmit.addEventListener('click', () => {
@@ -256,6 +277,9 @@ function updateSafePos() {
 
 // ------------------------------------------------------------------ game loop
 const clock = new THREE.Clock();
+let stepAccum = 0;
+let lastStepX = 0;
+let lastStepZ = 0;
 function animate() {
   requestAnimationFrame(animate);
   const dt = Math.min(clock.getDelta(), 0.05);
@@ -263,6 +287,14 @@ function animate() {
   if (state.started && !state.modalOpen && !state.won && !state.over) {
     player.update(dt, { onDanger });
     updateSafePos();
+    // Pasos: un sonido cada cierta distancia recorrida
+    const p = player.object.position;
+    const moved = Math.hypot(p.x - lastStepX, p.z - lastStepZ);
+    lastStepX = p.x; lastStepZ = p.z;
+    if (playing() && moved > 0.002 && moved < 5) {
+      stepAccum += moved;
+      if (stepAccum > 3.0) { audio.footstep(); stepAccum = 0; }
+    }
   }
   updateInteraction();
   renderer.render(scene, camera);
