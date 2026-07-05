@@ -66,6 +66,7 @@ function handleInteract(it) {
     return;
   }
   if (it.kind === 'portal') { enterMundo2(); return; }
+  if (it.kind === 'treasure') { grandFinale(); return; }
   const pista = PISTAS[it.pistaIdx];
   if (it.kind === 'inscription') {
     state.read[it.pistaIdx] = true;
@@ -104,30 +105,43 @@ function submitRiddle(pista, idx) {
 }
 
 function onPistaSolved(pista, idx) {
-  const isLast = idx + 1 >= PISTAS.length;
-  if (isLast) {
-    // Última pista implementada: pantalla de victoria (fin de lo jugable)
-    hud.hideRiddle();
-    state.won = true;
-    state.modalOpen = true;
-    if (player.controls.isLocked) player.controls.unlock();
-    hud.showWin(pista.solvedText);
-    return;
-  }
-  // Avanza a la próxima pista.
   const next = PISTAS[idx + 1];
   state.currentPista = idx + 1;
+  hud.hideRiddle();
+  if (!next) {
+    // Resolviste la última pista con acertijo (el castillo): aparece el tesoro
+    // final. La victoria real es abrir el cofre del tesoro.
+    world.showTreasureBeacon();
+    hud.setObjective(pista.nextObjective);
+    hud.showClue(pista.solvedText + '\n\n➡ ' + pista.nextObjective);
+    return;
+  }
   if (worldOf(next) !== worldOf(pista)) {
-    // Cruce de mundo: se enciende el portal de la montaña (no la baliza de la
-    // próxima pista, que está en el otro mundo).
+    // Cruce de mundo: se enciende el portal de la montaña (la baliza de la
+    // próxima pista está en el otro mundo).
     world.showPortalBeacon();
   } else {
     world.showBeacon(idx + 1);
   }
   hud.setObjective(pista.nextObjective);
-  // Sustituye el acertijo por el pergamino del botín (el modal sigue abierto).
-  hud.hideRiddle();
   hud.showClue(pista.solvedText + '\n\n➡ ' + pista.nextObjective);
+}
+
+// Abrir el cofre del tesoro = final del juego.
+function grandFinale() {
+  audio.chestOpen();
+  state.won = true;
+  state.modalOpen = true;
+  if (!player.mobile && player.controls.isLocked) player.controls.unlock();
+  const h1 = document.querySelector('#win h1');
+  const sub = document.querySelector('#win .subtitle');
+  if (h1) h1.textContent = '🏆 ¡GANASTE! Encontraste el tesoro';
+  if (sub) sub.textContent = '¡Completaste La Isla del Tesoro! 🏴‍☠️ Gracias por jugar. 🎉';
+  hud.showWin(
+    'Girás la llave y el cofre se abre en un destello: adentro brillan montañas ' +
+    'de oro, joyas y la corona pirata. Tu plata final: 💎 ' + state.diamonds +
+    '  ⭐ ' + state.stars + '. ¡La aventura está completa!'
+  );
 }
 
 // Cruzar el portal de la montaña: cambia todo el escenario al Mundo 2 (bosque).
@@ -268,21 +282,33 @@ function showApp(name) {
 }
 
 function buildMapSVG2() {
-  const done = state.solved[4];
-  const cur = state.currentPista === 4;
-  const ring = done ? '#2e7d32' : cur ? '#e8a91b' : '#ffffff';
+  const toX = (x) => 110 + x * 1.1;
+  const toY = (z) => 115 + z * 0.78;
+  const pts = [
+    { x: 0, z: -28, e: '⛏️', label: 'Mina / carrito', idx: 4 },
+    { x: 40, z: 4, e: '🌴', label: 'Palmera', idx: 5 },
+    { x: -40, z: 2, e: '🏚️', label: 'Casa embrujada', idx: 6 },
+    { x: 0, z: 50, e: '🏰', label: 'Castillo', idx: 7 },
+    { x: 0, z: 84, e: '💎', label: 'Tesoro', idx: 8 },
+  ];
   let pines = '';
-  const seedPts = [[40, 60], [170, 50], [55, 150], [180, 160], [90, 40], [150, 120], [30, 110]];
-  for (const [px, py] of seedPts) pines += `<text x="${px}" y="${py}" font-size="18" text-anchor="middle">🌲</text>`;
+  const seedPts = [[35, 50], [180, 60], [60, 175], [175, 175], [150, 40], [40, 130]];
+  for (const [px, py] of seedPts) pines += `<text x="${px}" y="${py}" font-size="16" text-anchor="middle">🌲</text>`;
+  let markers = '', legend = '';
+  for (const m of pts) {
+    const x = toX(m.x), y = toY(m.z);
+    const done = state.solved[m.idx];
+    const cur = state.currentPista === m.idx;
+    const ring = done ? '#2e7d32' : cur ? '#e8a91b' : '#ffffff';
+    markers += `<circle cx="${x}" cy="${y}" r="11" fill="rgba(255,255,255,.92)" stroke="${ring}" stroke-width="3"/>`;
+    markers += `<text x="${x}" y="${y + 5}" font-size="13" text-anchor="middle">${m.e}</text>`;
+    if (done) markers += `<text x="${x + 9}" y="${y - 6}" font-size="11" text-anchor="middle">✅</text>`;
+    legend += `<div>${m.e} ${m.label} ${done ? '✅' : cur ? '⟵ estás acá' : ''}</div>`;
+  }
   return `<svg class="map-svg" viewBox="0 0 220 220" xmlns="http://www.w3.org/2000/svg">
     <rect width="220" height="220" rx="12" fill="#24352b"/>
-    ${pines}
-    <circle cx="110" cy="95" r="12" fill="rgba(255,255,255,.92)" stroke="${ring}" stroke-width="3"/>
-    <text x="110" y="100" font-size="13" text-anchor="middle">⛏️</text>
-  </svg><div class="map-legend">
-    <div>⛏️ Mina / carrito ${done ? '✅' : cur ? '⟵ estás acá' : ''}</div>
-    <div style="opacity:.7">🌴 Palmera · 🏚️ Casa · 🏰 Castillo (próximamente)</div>
-  </div>`;
+    ${pines}${markers}
+  </svg><div class="map-legend">${legend}</div>`;
 }
 
 function buildMapSVG() {
@@ -411,6 +437,31 @@ function checkCollectibles() {
   }
 }
 
+// El esqueleto del castillo persigue al jugador mientras la Pista 8 está activa.
+function updateSkeleton(dt) {
+  const sk = world.skeleton;
+  if (!sk) return;
+  const active = state.currentPista === 7 && !state.solved[7];
+  if (!active) { sk.group.visible = false; return; }
+  sk.group.visible = true;
+  const p = player.object.position;
+  const near = Math.hypot(p.x - sk.homeX, p.z - sk.homeZ) < 36;
+  if (near) {
+    const dx = p.x - sk.x, dz = p.z - sk.z;
+    const d = Math.hypot(dx, dz);
+    if (d > 0.1) { const s = 4.6 * dt; sk.x += (dx / d) * s; sk.z += (dz / d) * s; }
+    sk.group.rotation.y = Math.atan2(dx, dz);
+    if (d < 1.8 && player._justRespawned <= 0) {
+      onDanger('¡El esqueleto te atrapó! 💀');
+      sk.x = sk.homeX; sk.z = sk.homeZ;
+    }
+  } else {
+    const dx = sk.homeX - sk.x, dz = sk.homeZ - sk.z, d = Math.hypot(dx, dz);
+    if (d > 0.2) { const s = 3 * dt; sk.x += (dx / d) * s; sk.z += (dz / d) * s; }
+  }
+  sk.group.position.set(sk.x, world.heightAt(sk.x, sk.z), sk.z);
+}
+
 // Último punto seguro (para respawnear tras un peligro)
 function updateSafePos() {
   const p = player.object.position;
@@ -434,6 +485,7 @@ function animate() {
     player.update(dt, { onDanger });
     updateSafePos();
     checkCollectibles();
+    updateSkeleton(dt);
     // Pasos: un sonido cada cierta distancia recorrida
     const p = player.object.position;
     const moved = Math.hypot(p.x - lastStepX, p.z - lastStepZ);

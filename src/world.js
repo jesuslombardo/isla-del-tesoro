@@ -22,6 +22,10 @@ export const MOUNTAIN = new THREE.Vector3(8, 0, -34); // montaña con portal al 
 // Mundo 2 (el bosque)
 export const SPAWN2 = new THREE.Vector3(0, 0, 8); // aparición en el Mundo 2
 export const MINE = new THREE.Vector3(0, 0, -28); // Pista 5 (carrito minero)
+export const PALMERA = new THREE.Vector3(40, 0, 4); // Pista 6
+export const CASA = new THREE.Vector3(-40, 0, 2); // Pista 7 (casa embrujada)
+export const CASTILLO = new THREE.Vector3(0, 0, 50); // Pista 8 (castillo)
+export const TREASURE = new THREE.Vector3(0, 0, 84); // cofre del tesoro (final)
 
 // Terreno del bosque (Mundo 2): colinas suaves, siempre sobre el nivel 0.
 export function forestHeightAt(x, z) {
@@ -1101,16 +1105,29 @@ export class World {
     // Pinos del bosque
     let seed = 4242;
     const rnd = () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647; };
-    for (let i = 0; i < 130; i++) {
-      const x = (rnd() - 0.5) * 220;
-      const z = (rnd() - 0.5) * 220;
+    for (let i = 0; i < 150; i++) {
+      const x = (rnd() - 0.5) * 230;
+      const z = (rnd() - 0.5) * 230;
       if (Math.hypot(x - MINE.x, z - MINE.z) < 16) continue;
       if (Math.hypot(x - SPAWN2.x, z - SPAWN2.z) < 8) continue;
+      if (Math.hypot(x - PALMERA.x, z - PALMERA.z) < 12) continue;
+      if (Math.hypot(x - CASA.x, z - CASA.z) < 16) continue;
+      if (Math.hypot(x - CASTILLO.x, z - CASTILLO.z) < 22) continue;
+      if (Math.abs(x) < 4 && z > 56 && z < 84) continue; // camino del puente
       this._pine(x, z, rnd);
     }
 
     this._buildMine(); // Pista 5
+    this._buildPalmera(); // Pista 6
+    this._buildCasa(); // Pista 7
+    this._buildCastillo(); // Pista 8 (+ esqueleto que persigue)
+    this._buildBridgeTreasure(); // final: puente + cofre del tesoro
+
     this._buildBeacon(4, MINE, 0xffb14a, true);
+    this._buildBeacon(5, PALMERA, 0xffe24a, false);
+    this._buildBeacon(6, CASA, 0xb98cff, false);
+    this._buildBeacon(7, CASTILLO, 0xff6a6a, false);
+    this._buildTreasureBeacon();
   }
 
   _pine(x, z, rnd) {
@@ -1222,6 +1239,234 @@ export class World {
     this.colliders.push({ x: cx - 5, z: cz + 4, r: 0.9 });
     this.colliders.push({ x: chest.position.x, z: chest.position.z, r: 1.6 });
   }
+
+  // ------------------------------------------------- helper: cartel + cofre (P6-P8)
+  _signAndChest(sx, sz, cx, cz, idx, signPrompt) {
+    const wood = new THREE.MeshStandardMaterial({ color: 0x6b4a2b, roughness: 0.9 });
+    const sg = this.heightAt(sx, sz);
+    const post = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, 2.6, 6), wood);
+    post.position.set(sx, sg + 1.3, sz);
+    this.add(post);
+    const board = new THREE.Mesh(new THREE.BoxGeometry(2.6, 1.3, 0.16), new THREE.MeshStandardMaterial({ color: 0x8a6a3a, roughness: 1 }));
+    board.position.set(sx, sg + 2.1, sz);
+    board.rotation.y = 0.3;
+    board.castShadow = true;
+    this.add(board);
+    this._glowMark(sx, sg + 3.1, sz, 0xffd27a);
+    const chest = this._buildChest(cx, this.heightAt(cx, cz), cz, idx);
+    this.interactables.push({ id: `insc-${idx}`, kind: 'inscription', pistaIdx: idx, position: new THREE.Vector3(sx, sg + 2, sz), radius: 4.5, prompt: signPrompt });
+    this.interactables.push({ id: `chest-${idx}`, kind: 'chest', pistaIdx: idx, position: chest.position.clone(), radius: 4, prompt: 'Presioná [E] para abrir el cofre' });
+    this.colliders.push({ x: sx, z: sz, r: 0.9 });
+    this.colliders.push({ x: chest.position.x, z: chest.position.z, r: 1.6 });
+  }
+
+  // --------------------------------------------------------------- Pista 6: palmera
+  _buildPalmera() {
+    const cx = PALMERA.x, cz = PALMERA.z, g = forestHeightAt(cx, cz);
+    const palm = new THREE.Group();
+    const trunkH = 7;
+    const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.62, trunkH, 8), new THREE.MeshStandardMaterial({ color: 0x8a6a3a, roughness: 1 }));
+    trunk.position.y = trunkH / 2; trunk.rotation.z = 0.08;
+    palm.add(trunk);
+    const leafMat = new THREE.MeshStandardMaterial({ color: 0x3f9b47, roughness: 1, side: THREE.DoubleSide });
+    for (let k = 0; k < 7; k++) {
+      const leaf = new THREE.Mesh(new THREE.ConeGeometry(0.9, 4, 4), leafMat);
+      const a = (k / 7) * Math.PI * 2;
+      leaf.position.set(Math.cos(a) * 1.7, trunkH + 0.2, Math.sin(a) * 1.7);
+      leaf.rotation.z = Math.PI / 2.3; leaf.rotation.y = -a;
+      palm.add(leaf);
+    }
+    for (let k = 0; k < 3; k++) {
+      const coco = new THREE.Mesh(new THREE.SphereGeometry(0.32, 8, 8), new THREE.MeshStandardMaterial({ color: 0x5a3d22 }));
+      coco.position.set(Math.cos(k * 2) * 0.6, trunkH - 0.5, Math.sin(k * 2) * 0.6);
+      palm.add(coco);
+    }
+    palm.traverse((o) => { o.castShadow = true; });
+    palm.position.set(cx, g, cz);
+    this.add(palm);
+    this.colliders.push({ x: cx, z: cz, r: 1 });
+    // piedras del claro
+    for (let a = 0; a < Math.PI * 2; a += Math.PI / 4) {
+      const rx = cx + Math.cos(a) * 5.5, rz = cz + Math.sin(a) * 5.5;
+      const s = 0.6 + (a % 1) * 0.4;
+      const rock = new THREE.Mesh(new THREE.DodecahedronGeometry(s, 0), new THREE.MeshStandardMaterial({ color: 0x7d766a, roughness: 1 }));
+      rock.position.set(rx, forestHeightAt(rx, rz) + s * 0.3, rz);
+      this.add(rock);
+    }
+    this._signAndChest(cx - 4, cz + 4, cx + 4, cz + 3, 5, 'Presioná [E] para leer la tabla bajo la palmera');
+  }
+
+  // ------------------------------------------------------- Pista 7: casa embrujada
+  _buildCasa() {
+    const cx = CASA.x, cz = CASA.z, g = forestHeightAt(cx, cz);
+    const darkWood = new THREE.MeshStandardMaterial({ color: 0x4a3b2c, roughness: 1 });
+    const dark = new THREE.MeshStandardMaterial({ color: 0x141210, roughness: 1 });
+    const body = new THREE.Mesh(new THREE.BoxGeometry(8, 5, 7), darkWood);
+    body.position.set(cx, g + 2.5, cz); body.castShadow = true; body.receiveShadow = true;
+    this.add(body);
+    const roof = new THREE.Mesh(new THREE.ConeGeometry(6.4, 3, 4), new THREE.MeshStandardMaterial({ color: 0x2f2016, roughness: 1 }));
+    roof.rotation.y = Math.PI / 4; roof.position.set(cx, g + 6.4, cz); roof.castShadow = true;
+    this.add(roof);
+    const door = new THREE.Mesh(new THREE.BoxGeometry(1.6, 3, 0.2), dark);
+    door.position.set(cx, g + 1.5, cz + 3.55);
+    this.add(door);
+    for (const sx of [-2.4, 2.4]) {
+      const win = new THREE.Mesh(new THREE.BoxGeometry(1.4, 1.4, 0.2), dark);
+      win.position.set(cx + sx, g + 3.2, cz + 3.55);
+      this.add(win);
+    }
+    // cerco de madera (frente y laterales, con hueco de entrada)
+    const fenceMat = new THREE.MeshStandardMaterial({ color: 0x5e4a35, roughness: 1 });
+    for (let i = -7; i <= 7; i += 1.6) {
+      for (const [px, pz] of [[i, 7.5], [i, -7.5], [7.5, i], [-7.5, i]]) {
+        if (pz === 7.5 && Math.abs(px) < 1.6) continue; // hueco de entrada
+        const post = new THREE.Mesh(new THREE.BoxGeometry(0.22, 1.5, 0.22), fenceMat);
+        post.position.set(cx + px, forestHeightAt(cx + px, cz + pz) + 0.75, cz + pz);
+        this.add(post);
+      }
+    }
+    this.colliders.push({ x: cx, z: cz, r: 5 });
+    this._signAndChest(cx - 2.8, cz + 6.5, cx + 2.8, cz + 6.5, 6, 'Presioná [E] para leer la pared de la casa');
+  }
+
+  // ----------------------------------------------------------- Pista 8: castillo
+  _buildCastillo() {
+    const cx = CASTILLO.x, cz = CASTILLO.z, g = forestHeightAt(cx, cz);
+    const stone = new THREE.MeshStandardMaterial({ color: 0x8a8578, roughness: 1 });
+    const dark = new THREE.MeshStandardMaterial({ color: 0x141210, roughness: 1 });
+    const keep = new THREE.Mesh(new THREE.BoxGeometry(16, 9, 12), stone);
+    keep.position.set(cx, g + 4.5, cz); keep.castShadow = true; keep.receiveShadow = true;
+    this.add(keep);
+    // almenas
+    for (let i = -3; i <= 3; i++) {
+      for (const zz of [cz - 6, cz + 6]) {
+        const merlon = new THREE.Mesh(new THREE.BoxGeometry(1.3, 1.3, 1.3), stone);
+        merlon.position.set(cx + i * 2.3, g + 9.6, zz);
+        this.add(merlon);
+      }
+    }
+    // torre
+    const tower = new THREE.Mesh(new THREE.CylinderGeometry(2.6, 2.9, 13, 10), stone);
+    tower.position.set(cx - 9, g + 6.5, cz - 3); tower.castShadow = true;
+    this.add(tower);
+    for (let a = 0; a < Math.PI * 2; a += Math.PI / 4) {
+      const merlon = new THREE.Mesh(new THREE.BoxGeometry(1, 1.2, 1), stone);
+      merlon.position.set(cx - 9 + Math.cos(a) * 2.7, g + 13.2, cz - 3 + Math.sin(a) * 2.7);
+      this.add(merlon);
+    }
+    // portón oscuro (norte, hacia el jugador)
+    const gate = new THREE.Mesh(new THREE.BoxGeometry(3.4, 5, 0.5), dark);
+    gate.position.set(cx, g + 2.5, cz - 6.2);
+    this.add(gate);
+    // arañas (bolitas negras colgando)
+    for (const [sx, sy, sz] of [[4, 7, -6.3], [-5, 6, -6.3]]) {
+      const thread = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 2, 4), dark);
+      thread.position.set(cx + sx, g + sy + 1, cz + sz);
+      this.add(thread);
+      const spider = new THREE.Mesh(new THREE.SphereGeometry(0.25, 8, 6), dark);
+      spider.position.set(cx + sx, g + sy, cz + sz);
+      this.add(spider);
+    }
+    this.colliders.push({ x: cx, z: cz, r: 9 });
+    this.colliders.push({ x: cx - 9, z: cz - 3, r: 3 });
+
+    this._buildSkeleton(cx, cz - 15);
+    this._signAndChest(cx - 4, cz - 13, cx + 4, cz - 13, 7, 'Presioná [E] para leer la placa del castillo');
+  }
+
+  _buildSkeleton(x, z) {
+    const g = new THREE.Group();
+    const bone = new THREE.MeshStandardMaterial({ color: 0xeae6d8, roughness: 0.8 });
+    const skull = new THREE.Mesh(new THREE.SphereGeometry(0.5, 10, 8), bone);
+    skull.position.y = 3.3; g.add(skull);
+    for (const ex of [-0.18, 0.18]) {
+      const eye = new THREE.Mesh(new THREE.SphereGeometry(0.1, 6, 6), new THREE.MeshBasicMaterial({ color: 0xff2a2a }));
+      eye.position.set(ex, 3.35, 0.42); g.add(eye);
+    }
+    const rib = new THREE.Mesh(new THREE.BoxGeometry(1.1, 1.4, 0.6), bone);
+    rib.position.y = 2.1; g.add(rib);
+    const spine = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 1.2, 6), bone);
+    spine.position.y = 2.7; g.add(spine);
+    for (const sx of [-0.7, 0.7]) {
+      const arm = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 1.8, 6), bone);
+      arm.position.set(sx, 2.1, 0); arm.rotation.z = sx > 0 ? 0.3 : -0.3; g.add(arm);
+      const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.14, 1.8, 6), bone);
+      leg.position.set(sx * 0.5, 0.9, 0); g.add(leg);
+    }
+    g.traverse((o) => { o.castShadow = true; });
+    g.position.set(x, forestHeightAt(x, z), z);
+    g.visible = false;
+    this.add(g);
+    this.skeleton = { group: g, x, z, homeX: x, homeZ: z };
+  }
+
+  // ----------------------------------------------- final: puente + cofre del tesoro
+  _buildBridgeTreasure() {
+    const wood = new THREE.MeshStandardMaterial({ color: 0x6b4a2b, roughness: 0.9 });
+    const rope = new THREE.MeshStandardMaterial({ color: 0x3a2a18, roughness: 1 });
+    const baseY = forestHeightAt(0, 70);
+    // abismo oscuro
+    const chasm = new THREE.Mesh(new THREE.BoxGeometry(34, 5, 20), new THREE.MeshBasicMaterial({ color: 0x070707 }));
+    chasm.position.set(0, baseY - 2.6, 70);
+    this.add(chasm);
+    // puente de tablas
+    const bridge = new THREE.Group();
+    for (let zz = 62; zz <= 78; zz += 1.1) {
+      const plank = new THREE.Mesh(new THREE.BoxGeometry(3, 0.2, 0.9), wood);
+      plank.position.set(0, baseY, zz);
+      bridge.add(plank);
+    }
+    for (const sx of [-1.6, 1.6]) {
+      const r = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 16, 5), rope);
+      r.rotation.x = Math.PI / 2;
+      r.position.set(sx, baseY + 1.3, 70);
+      bridge.add(r);
+      for (let zz = 62; zz <= 78; zz += 2.2) {
+        const post = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 1.4, 4), rope);
+        post.position.set(sx, baseY + 0.7, zz);
+        bridge.add(post);
+      }
+    }
+    bridge.traverse((o) => { o.castShadow = true; });
+    this.add(bridge);
+
+    // pedestal + cofre del tesoro
+    const tx = TREASURE.x, tz = TREASURE.z, tg = forestHeightAt(tx, tz);
+    const pedestal = new THREE.Mesh(new THREE.CylinderGeometry(3.2, 3.6, 1.5, 12), new THREE.MeshStandardMaterial({ color: 0x8a8578, roughness: 1 }));
+    pedestal.position.set(tx, tg + 0.75, tz); pedestal.receiveShadow = true;
+    this.add(pedestal);
+    const gold = new THREE.MeshStandardMaterial({ color: 0xf4c95d, metalness: 0.7, roughness: 0.3, emissive: 0x6a4e00, emissiveIntensity: 0.4 });
+    const box = new THREE.Mesh(new THREE.BoxGeometry(4, 2.2, 2.6), new THREE.MeshStandardMaterial({ color: 0x7a4a22, roughness: 0.8 }));
+    box.position.set(tx, tg + 2.6, tz); box.castShadow = true;
+    this.add(box);
+    const band = new THREE.Mesh(new THREE.BoxGeometry(4.1, 0.4, 2.7), gold);
+    band.position.set(tx, tg + 3.1, tz);
+    this.add(band);
+    const lock = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.7, 0.3), gold);
+    lock.position.set(tx, tg + 2.6, tz + 1.35);
+    this.add(lock);
+    const glow = new THREE.PointLight(0xffe08a, 2.2, 30, 2);
+    glow.position.set(tx, tg + 4, tz);
+    this.add(glow);
+    this._glowMark(tx, tg + 4.6, tz, 0xfff1a8);
+
+    this.interactables.push({ id: 'treasure', kind: 'treasure', pistaIdx: 8, position: new THREE.Vector3(tx, tg + 2.5, tz), radius: 5, prompt: 'Presioná [E] para abrir el COFRE DEL TESORO' });
+    this.colliders.push({ x: tx, z: tz, r: 2.6 });
+  }
+
+  _buildTreasureBeacon() {
+    const y = forestHeightAt(TREASURE.x, TREASURE.z);
+    const beam = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.7, 2.2, 48, 12, 1, true),
+      new THREE.MeshBasicMaterial({ color: 0xffe08a, transparent: true, opacity: 0.24, side: THREE.DoubleSide })
+    );
+    beam.position.set(TREASURE.x, y + 24, TREASURE.z);
+    beam.visible = false;
+    this.add(beam);
+    this._treasureBeacon = beam;
+    this._animated.push((t) => { beam.material.opacity = 0.18 + Math.sin(t * 2) * 0.09; });
+  }
+  showTreasureBeacon() { if (this._treasureBeacon) this._treasureBeacon.visible = true; }
 
   update(dt) {
     this._time += dt;

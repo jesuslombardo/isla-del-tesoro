@@ -130,8 +130,79 @@ export const PISTAS = [
     solvedText:
       '¡El carrito esconde un cofre! Adentro, un mapa del bosque marca una ' +
       'PALMERA solitaria en un claro entre los pinos.',
-    // Última pista implementada por ahora: al resolverla se muestra la victoria.
-    nextObjective: null,
+    nextObjective:
+      'Buscá la PALMERA solitaria en el claro (el único árbol de playa entre los pinos).',
+  },
+  {
+    id: 'palmera',
+    num: 6,
+    place: 'la palmera',
+    inscription:
+      'Enterrada entre los cocos caídos, una tabla dice:\n\n' +
+      '  "Descansá a la sombra de la palma,\n' +
+      '   pero no te quedes: más adentro del bosque,\n' +
+      '   en un claro sombrío, te espera una CASA\n' +
+      '   que nadie habita hace años."\n\n' +
+      '(Una construcción abandonada, con su cerco de madera.)',
+    question: 'Según la tabla, ¿qué construcción abandonada guarda la próxima pista?',
+    answers: ['casa', 'la casa', 'casa embrujada', 'casa abandonada'],
+    hints: [
+      'Es donde vive (o vivía) la gente, pero está abandonada.',
+      'Tiene techo, puerta, ventanas y un cerco de madera alrededor.',
+      'Empieza con "C". Es una ca__.',
+    ],
+    solvedText:
+      '¡Bajo la palmera había un cofre! Dentro, el mapa marca una CASA ' +
+      'embrujada en un claro sombrío del bosque.',
+    nextObjective: 'Andá a la CASA embrujada del claro y entrá a buscar la pista.',
+  },
+  {
+    id: 'casa',
+    num: 7,
+    place: 'la casa embrujada',
+    inscription:
+      'En la pared descascarada, alguien escribió con carbón:\n\n' +
+      '  "Los dueños huyeron hacia la colina.\n' +
+      '   Allí se alza un CASTILLO en ruinas.\n' +
+      '   Buscá la pista adentro...\n' +
+      '   pero algo que debería estar muerto, camina."\n\n' +
+      '(Un castillo con torres y almenas, en lo alto.)',
+    question: 'Según el mensaje, ¿qué construcción en la colina esconde la próxima pista?',
+    answers: ['castillo', 'el castillo', 'castillo abandonado', 'castillo en ruinas'],
+    hints: [
+      'Es grande, de piedra, con torres y almenas, como de un rey.',
+      'Está en ruinas, en lo alto de la colina.',
+      'Empieza con "C". Es un cast____.',
+    ],
+    solvedText:
+      '¡El cofre de la casa se abre! El mapa marca el CASTILLO en ruinas de la ' +
+      'colina. ⚠️ Cuidado: adentro hay un esqueleto que despertó... y persigue.',
+    nextObjective: 'Subí al CASTILLO y buscá la pista adentro. 💀 ¡Escapá del esqueleto!',
+  },
+  {
+    id: 'castillo',
+    num: 8,
+    place: 'el castillo',
+    inscription:
+      'En un cuadro torcido del salón, una placa de bronce dice:\n\n' +
+      '  "El guardián de huesos cuida la salida.\n' +
+      '   Tomá la LLAVE del cofre y no mires atrás:\n' +
+      '   cruzá el PUENTE colgante sobre el abismo\n' +
+      '   y el tesoro será tuyo."\n\n' +
+      '(Para llegar al tesoro hay que cruzar algo sobre el abismo.)',
+    question:
+      'Según la placa, con la llave en mano, ¿qué hay que cruzar sobre el ' +
+      'abismo para llegar al tesoro?',
+    answers: ['puente', 'el puente', 'puente colgante'],
+    hints: [
+      'Es lo que se cruza para pasar de un lado al otro sobre un abismo.',
+      'Es colgante, hecho de tablas y sogas.',
+      'Empieza con "P". Es un pu____.',
+    ],
+    solvedText:
+      '¡Conseguiste la LLAVE dorada! El esqueleto se desploma en un montón de ' +
+      'huesos. Ahora cruzá el PUENTE colgante hasta el cofre del tesoro.',
+    nextObjective: 'Con la llave, cruzá el PUENTE colgante hasta el cofre del tesoro. 🗝️🌉',
   },
 ];
 

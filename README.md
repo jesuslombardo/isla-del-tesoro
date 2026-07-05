@@ -4,10 +4,12 @@ Juego 3D en primera persona (WebGL / Three.js) sobre un naufragio y la búsqueda
 de un tesoro. Corre 100% en el navegador, **sin build step** y sin dependencias
 externas en tiempo de ejecución (Three.js está vendorizado en `vendor/`).
 
-> **Estado:** **Mundo 1** completo (Pistas 1-4: cueva, volcán, lago, dragón) +
-> transición por la **montaña** al **Mundo 2** (bosque) con la **Pista 5 (carrito
-> minero)**. Sistema de 3 vidas, plata (💎/⭐) que se junta, celular con mapa,
-> audio ambiente y controles para **PC y celular**.
+> **Estado: 🏆 JUEGO COMPLETO.** Los **2 mundos** y las **8 pistas** son jugables
+> de punta a punta (naufragio → cueva, volcán, lago, dragón → montaña/portal →
+> carrito, palmera, casa embrujada, castillo con esqueleto → puente + llave →
+> **cofre del tesoro**). Con 3 vidas, peligros (fuego del dragón, esqueleto que
+> persigue), plata (💎/⭐) que se junta, celular con mapa, audio ambiente y
+> controles para **PC y celular**.
 
 ▶️ **Jugar online:** https://jesuslombardo.github.io/isla-del-tesoro/
 (se publica solo vía GitHub Pages en cada push a `main`).
@@ -90,15 +92,17 @@ isla-del-tesoro/
 - [x] **Pista 2 · Volcán** ✅
 - [x] **Pista 3 · Lago** ✅
 - [x] **Pista 4 · Dragón** ✅ (escupe fuego — ¡peligro!)
-- [ ] Subir la montaña → Mundo 2
+- [x] Subir la montaña → **portal** al Mundo 2 ✅
 
 **Mundo 2 — El Bosque**
-- [x] Transición: subir la montaña → **portal** al Mundo 2 ✅
 - [x] **Pista 5 · Carrito minero** ✅
-- [ ] Pista 6 · Palmera
-- [ ] Pista 7 · Casa abandonada
-- [ ] Pista 8 · Castillo con esqueleto viviente (que te persigue)
-- [ ] Puente colgante + llave → **el cofre del tesoro** 🗝️
+- [x] **Pista 6 · Palmera** ✅
+- [x] **Pista 7 · Casa embrujada** ✅
+- [x] **Pista 8 · Castillo** con esqueleto viviente que te persigue ✅ (¡peligro!)
+- [x] Puente colgante + llave → **el cofre del tesoro** 🗝️ ✅ **¡JUEGO COMPLETO!**
+
+> 🏆 **El juego se puede terminar de punta a punta**: naufragio → 8 pistas en dos
+> mundos → tesoro final.
 
 ## 🛠️ Tecnología
 
