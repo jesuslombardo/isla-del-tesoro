@@ -69,6 +69,7 @@ export class World {
     this.chestLids = []; // tapa del cofre por pista
     this.beacons = []; // haz de luz guía por pista
     this.collectibles = [];
+    this._swayers = []; // plantas altas que se mecen con la brisa
     this._animated = []; // objetos con update(t)
     this._time = 0;
 
@@ -1020,22 +1021,25 @@ export class World {
       Math.hypot(x - DRAGON.x, z - DRAGON.z) < 18 ||
       Math.hypot(x - MOUNTAIN.x, z - MOUNTAIN.z) < 16 ||
       Math.hypot(x - SPAWN.x, z - SPAWN.z) < 9;
-    // Isla más grande y frondosa: muchas más plantas repartidas.
-    for (let i = 0; i < 420; i++) {
+    // Alfombra de pasto densa (miles de briznas en 1 draw call → barato en el celu).
+    this._buildGrassCarpet(terrainHeightAt, 3200, 8, 112, blocked);
+    // Plantas variadas (palmeras, arbustos, helechos, flores) repartidas encima.
+    for (let i = 0; i < 460; i++) {
       const ang = rnd() * Math.PI * 2;
-      const rad = 8 + rnd() * 106;
+      const rad = 8 + rnd() * 108;
       const x = Math.cos(ang) * rad;
       const z = Math.sin(ang) * rad;
       const h = terrainHeightAt(x, z);
-      if (h < 0.8 || h > 11) continue;
+      if (h < 0.7 || h > 11) continue;
       if (blocked(x, z)) continue;
       const r = rnd();
       if (r < 0.24) this._palm(x, h, z, rnd);
-      else if (r < 0.42) this._rock(x, h, z, rnd);
-      else if (r < 0.66) this._bush(x, h, z, rnd);
-      else if (r < 0.88) this._grassTuft(x, h, z, rnd);
+      else if (r < 0.38) this._rock(x, h, z, rnd);
+      else if (r < 0.60) this._bush(x, h, z, rnd);
+      else if (r < 0.80) this._fern(x, h, z, rnd);
       else this._flower(x, h, z, rnd);
     }
+    this._addSway();
   }
 
   _bush(x, y, z, rnd) {
@@ -1102,8 +1106,70 @@ export class World {
     }
     g.traverse((o) => { o.castShadow = true; });
     g.position.set(x, y, z);
+    g.scale.setScalar(0.85 + rnd() * 0.6);
     this.add(g);
+    this._swayers.push({ g, ph: rnd() * 6, amp: 0.03 });
     this.colliders.push({ x, z, r: 0.8 });
+  }
+
+  // Helecho: varias frondas verdes que se abren desde el centro
+  _fern(x, y, z, rnd) {
+    const g = new THREE.Group();
+    const mat = new THREE.MeshStandardMaterial({ color: rnd() < 0.5 ? 0x357a2e : 0x2f6b34, roughness: 1, side: THREE.DoubleSide });
+    const n = 5 + Math.floor(rnd() * 4);
+    for (let k = 0; k < n; k++) {
+      const frond = new THREE.Mesh(new THREE.ConeGeometry(0.28, 1.4 + rnd() * 0.8, 4), mat);
+      const a = (k / n) * Math.PI * 2;
+      frond.position.set(Math.cos(a) * 0.35, 0.6, Math.sin(a) * 0.35);
+      frond.rotation.z = Math.PI / 3;
+      frond.rotation.y = -a;
+      g.add(frond);
+    }
+    g.traverse((o) => { o.castShadow = true; });
+    g.position.set(x, y, z);
+    this.add(g);
+    this._swayers.push({ g, ph: rnd() * 6, amp: 0.05 });
+  }
+
+  // Alfombra de pasto densa y barata (miles de matas en 1 sola draw call)
+  _buildGrassCarpet(heightFn, count, minR, maxR, blocked, dark) {
+    const geo = new THREE.ConeGeometry(0.22, 0.7, 4);
+    geo.translate(0, 0.35, 0);
+    const inst = new THREE.InstancedMesh(geo, new THREE.MeshStandardMaterial({ roughness: 1 }), count);
+    inst.receiveShadow = true;
+    const UP = new THREE.Vector3(0, 1, 0);
+    const m = new THREE.Matrix4(), q = new THREE.Quaternion(), pos = new THREE.Vector3(), scl = new THREE.Vector3(), col = new THREE.Color();
+    let seed = 24680;
+    const rnd = () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647; };
+    for (let i = 0; i < count; i++) {
+      let x = 0, z = 0, h = -99, tries = 0;
+      do {
+        const a = rnd() * Math.PI * 2, rr = minR + rnd() * (maxR - minR);
+        x = Math.cos(a) * rr; z = Math.sin(a) * rr; h = heightFn(x, z); tries++;
+      } while ((h < 0.6 || h > 10 || (blocked && blocked(x, z))) && tries < 5);
+      if (h < 0.6 || h > 10) pos.set(0, -999, 0);
+      else pos.set(x, h, z);
+      q.setFromAxisAngle(UP, rnd() * Math.PI * 2);
+      const s = 0.7 + rnd() * 1.1;
+      scl.set(s, 0.7 + rnd() * 1.0, s);
+      m.compose(pos, q, scl);
+      inst.setMatrixAt(i, m);
+      col.setHSL(0.29 + rnd() * 0.05, 0.5 + rnd() * 0.2, (dark ? 0.26 : 0.36) + rnd() * 0.12);
+      inst.setColorAt(i, col);
+    }
+    inst.instanceMatrix.needsUpdate = true;
+    if (inst.instanceColor) inst.instanceColor.needsUpdate = true;
+    this.add(inst);
+  }
+
+  _addSway() {
+    const sw = this._swayers;
+    this._animated.push((t) => {
+      for (let i = 0; i < sw.length; i++) {
+        const s = sw[i];
+        s.g.rotation.z = Math.sin(t * 1.1 + s.ph) * s.amp;
+      }
+    });
   }
 
   _rock(x, y, z, rnd) {
@@ -1528,17 +1594,31 @@ export class World {
     // Pinos del bosque
     let seed = 4242;
     const rnd = () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647; };
-    for (let i = 0; i < 150; i++) {
-      const x = (rnd() - 0.5) * 230;
-      const z = (rnd() - 0.5) * 230;
-      if (Math.hypot(x - MINE.x, z - MINE.z) < 16) continue;
-      if (Math.hypot(x - SPAWN2.x, z - SPAWN2.z) < 8) continue;
-      if (Math.hypot(x - PALMERA.x, z - PALMERA.z) < 12) continue;
-      if (Math.hypot(x - CASA.x, z - CASA.z) < 16) continue;
-      if (Math.hypot(x - CASTILLO.x, z - CASTILLO.z) < 22) continue;
-      if (Math.abs(x) < 4 && z > 56 && z < 84) continue; // camino del puente
-      this._pine(x, z, rnd);
+    const blockedF = (x, z) =>
+      Math.hypot(x - MINE.x, z - MINE.z) < 16 ||
+      Math.hypot(x - SPAWN2.x, z - SPAWN2.z) < 7 ||
+      Math.hypot(x - PALMERA.x, z - PALMERA.z) < 12 ||
+      Math.hypot(x - CASA.x, z - CASA.z) < 16 ||
+      Math.hypot(x - CASTILLO.x, z - CASTILLO.z) < 22 ||
+      (Math.abs(x) < 4 && z > 56 && z < 84); // camino del puente
+    // Alfombra de pasto de bosque (densa y barata: 1 draw call para todo).
+    this._buildGrassCarpet(forestHeightAt, 3000, 4, 150, blockedF, true);
+    // Bosque denso: pinos, helechos, arbustos, hongos, piedras y troncos.
+    for (let i = 0; i < 360; i++) {
+      const x = (rnd() - 0.5) * 250;
+      const z = (rnd() - 0.5) * 250;
+      if (Math.hypot(x, z) > 155) continue;
+      if (blockedF(x, z)) continue;
+      const h = forestHeightAt(x, z);
+      const r = rnd();
+      if (r < 0.50) this._pine(x, z, rnd);
+      else if (r < 0.64) this._fern(x, h, z, rnd);
+      else if (r < 0.80) this._bush(x, h, z, rnd);
+      else if (r < 0.90) this._prop('mushroom', x, h, z, rnd);
+      else if (r < 0.96) this._prop('rock', x, h, z, rnd);
+      else this._log(x, z, rnd);
     }
+    this._addSway();
 
     this._buildMine(); // Pista 5
     this._buildPalmera(); // Pista 6
@@ -1560,18 +1640,28 @@ export class World {
     const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.42, trunkH, 6), new THREE.MeshStandardMaterial({ color: 0x5a3d22, roughness: 1 }));
     trunk.position.y = trunkH / 2;
     g.add(trunk);
-    const leaf = new THREE.MeshStandardMaterial({ color: 0x2f5a2c, roughness: 1 });
-    const tiers = 3;
+    const leaf = new THREE.MeshStandardMaterial({ color: rnd() < 0.5 ? 0x2f5a2c : 0x356630, roughness: 1 });
+    const tiers = 3 + (rnd() < 0.4 ? 1 : 0);
     for (let t = 0; t < tiers; t++) {
-      const cone = new THREE.Mesh(new THREE.ConeGeometry(2.4 - t * 0.6, 2.4, 7), leaf);
+      const cone = new THREE.Mesh(new THREE.ConeGeometry(2.4 - t * 0.55, 2.4, 7), leaf);
       cone.position.y = trunkH + t * 1.5;
       g.add(cone);
     }
     g.traverse((o) => { o.castShadow = true; });
     g.position.set(x, y, z);
-    g.scale.setScalar(0.8 + rnd() * 0.8);
+    g.scale.setScalar(0.8 + rnd() * 0.9);
     this.add(g);
+    this._swayers.push({ g, ph: rnd() * 6, amp: 0.025 });
     this.colliders.push({ x, z, r: 0.9 });
+  }
+
+  _log(x, z, rnd) {
+    const y = forestHeightAt(x, z);
+    const log = new THREE.Mesh(new THREE.CylinderGeometry(0.45, 0.55, 3 + rnd() * 3, 8), new THREE.MeshStandardMaterial({ color: 0x4a3320, roughness: 1 }));
+    log.rotation.z = Math.PI / 2; log.rotation.y = rnd() * Math.PI;
+    log.position.set(x, y + 0.45, z); log.castShadow = true;
+    this.add(log);
+    this.colliders.push({ x, z, r: 1.4 });
   }
 
   _buildMine() {
