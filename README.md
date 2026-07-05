@@ -4,14 +4,18 @@ Juego 3D en primera persona (WebGL / Three.js) sobre un naufragio y la búsqueda
 de un tesoro. Corre 100% en el navegador, **sin build step** y sin dependencias
 externas en tiempo de ejecución (Three.js está vendorizado en `vendor/`).
 
-> **Estado: MVP** — Mundo 1 navegable + **Pista 1 (la cueva)** jugable de punta a
-> punta, con sistema de 3 vidas y pistas (hints).
+> **Estado:** Mundo 1 navegable con las **Pistas 1 (cueva)** y **2 (volcán)**
+> jugables de punta a punta, encadenadas, con sistema de 3 vidas y pistas (hints).
+
+▶️ **Jugar online:** https://jesuslombardo.github.io/isla-del-tesoro/
+(se publica solo vía GitHub Pages en cada push a `main`).
 
 ## 🎮 Cómo se juega
 
 Naufragaste en una isla desconocida. Entre los restos del barco encontraste un
-mapa: la primera marca apunta a una **cueva**. Encontrala, leé la inscripción de
-la pared y usá esa pista para abrir el **cofre** y descubrir hacia dónde seguir.
+mapa: la primera marca apunta a una **cueva**. Cada pista te lleva a la siguiente:
+explorás el lugar, leés una inscripción y con esa clave abrís el **cofre** que
+revela el próximo destino (cueva → volcán → …).
 
 ### Controles
 
@@ -69,8 +73,8 @@ isla-del-tesoro/
 
 **Mundo 1 — La Isla**
 - [x] Pista 0 · Naufragio (encontrás el mapa) — *punto de partida*
-- [x] **Pista 1 · Cueva** — *incluida en el MVP*
-- [ ] Pista 2 · Volcán
+- [x] **Pista 1 · Cueva** ✅
+- [x] **Pista 2 · Volcán** ✅
 - [ ] Pista 3 · Lago
 - [ ] Pista 4 · Dragón
 - [ ] Subir la montaña → Mundo 2

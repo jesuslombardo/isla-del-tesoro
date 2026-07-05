@@ -1,12 +1,12 @@
 import * as THREE from 'three';
-import { World, SPAWN, CAVE, VOLCANO, terrainHeightAt } from './world.js';
+import { World, SPAWN, CAVE, terrainHeightAt } from './world.js';
 import { Player } from './player.js';
 import { HUD } from './hud.js';
-import { PISTA_1, isCorrect } from './puzzles.js';
+import { PISTAS, isCorrect } from './puzzles.js';
 
 // ============================================================================
-//  La Isla del Tesoro — MVP
-//  Mundo 1: isla navegable en 3D + Pista 1 (la cueva).
+//  La Isla del Tesoro
+//  Mundo 1: isla navegable en 3D. Pistas encadenadas (1 = cueva, 2 = volcán...).
 // ============================================================================
 
 const canvas = document.getElementById('game');
@@ -28,62 +28,78 @@ const hud = new HUD();
 const state = {
   lives: 3,
   started: false,
-  inscriptionRead: false,
-  solved: false,
+  currentPista: 0, // índice de la pista activa
+  read: [], // read[idx] = inscripción leída
+  solved: [], // solved[idx] = pista resuelta
   won: false,
   over: false,
   modalOpen: false,
-  active: null, // interactuable actual en rango
+  active: null,
   safePos: SPAWN.clone(),
 };
+let hintIdx = 0; // índice de pista/hint mostrada en el acertijo actual
 
 // ---------------------------------------------------------------- interacción
-function assignHandlers() {
-  for (const it of world.interactables) {
-    if (it.id === 'inscripcion') {
-      it.handler = () => {
-        state.inscriptionRead = true;
-        openModal(() => hud.showClue(PISTA_1.inscription));
-        hud.setObjective('Volvé al cofre y respondé con la palabra clave.');
-      };
-    } else if (it.id === 'cofre') {
-      it.handler = () => {
-        if (state.solved) { hud.toast('El cofre ya está abierto ✅'); return; }
-        openModal(() =>
-          hud.showRiddle(PISTA_1, {
-            onSubmit: submitRiddle,
-            onHint: () => showRiddleHint(),
-          })
-        );
-      };
-    }
+function handleInteract(it) {
+  // Solo se puede interactuar con la pista activa
+  if (it.pistaIdx !== state.currentPista) {
+    hud.toast('Todavía no es momento para esto. Seguí la pista actual.');
+    return;
+  }
+  const pista = PISTAS[it.pistaIdx];
+  if (it.kind === 'inscription') {
+    state.read[it.pistaIdx] = true;
+    openModal(() => hud.showClue(pista.inscription));
+    hud.setObjective('Volvé al cofre y respondé con la palabra clave.');
+  } else if (it.kind === 'chest') {
+    if (state.solved[it.pistaIdx]) { hud.toast('Ese cofre ya está abierto ✅'); return; }
+    hintIdx = 0;
+    openModal(() =>
+      hud.showRiddle(pista, {
+        onSubmit: () => submitRiddle(pista, it.pistaIdx),
+        onHint: () => showRiddleHint(pista),
+      })
+    );
   }
 }
 
-function submitRiddle() {
+function submitRiddle(pista, idx) {
   const val = hud.el.riddleInput.value;
   if (!val.trim()) return;
-  if (isCorrect(PISTA_1, val)) {
-    hud.riddleFeedback(true, '¡Correcto! 🗝️');
-    state.solved = true;
-    world.openChest();
-    world.hideCaveBeacon();
-    setTimeout(() => {
-      closeModal(() => hud.hideRiddle());
-      state.won = true;
-      state.modalOpen = true; // la pantalla de victoria queda abierta
-      hud.showWin(PISTA_1.solvedText);
-    }, 900);
-  } else {
+  if (!isCorrect(pista, val)) {
     hud.riddleFeedback(false, 'No es la palabra. Probá de nuevo o pedí una pista 💡');
+    return;
   }
+  hud.riddleFeedback(true, '¡Correcto! 🗝️');
+  state.solved[idx] = true;
+  world.openChest(idx);
+  world.hideBeacon(idx);
+  setTimeout(() => onPistaSolved(pista, idx), 900);
 }
 
-let riddleHintIdx = 0;
-function showRiddleHint() {
-  const hints = PISTA_1.hints;
-  const h = hints[Math.min(riddleHintIdx, hints.length - 1)];
-  riddleHintIdx++;
+function onPistaSolved(pista, idx) {
+  const isLast = idx + 1 >= PISTAS.length;
+  if (isLast) {
+    // Última pista implementada: pantalla de victoria (fin de lo jugable)
+    hud.hideRiddle();
+    state.won = true;
+    state.modalOpen = true;
+    if (player.controls.isLocked) player.controls.unlock();
+    hud.showWin(pista.solvedText);
+    return;
+  }
+  // Avanza a la próxima pista: muestra el botín y actualiza el objetivo.
+  state.currentPista = idx + 1;
+  world.showBeacon(idx + 1);
+  hud.setObjective(pista.nextObjective);
+  // Sustituye el acertijo por el pergamino del botín (el modal sigue abierto).
+  hud.hideRiddle();
+  hud.showClue(pista.solvedText + '\n\n➡ ' + pista.nextObjective);
+}
+
+function showRiddleHint(pista) {
+  const h = pista.hints[Math.min(hintIdx, pista.hints.length - 1)];
+  hintIdx++;
   hud.riddleFeedback(true, '💡 ' + h);
 }
 
@@ -125,56 +141,53 @@ function startGame() {
   hud.el.intro.classList.add('hidden');
   player.enabled = true;
   player.spawn(SPAWN);
-  player.lookAt(CAVE); // mirando hacia la cueva al arrancar
+  player.lookAt(CAVE);
   player.controls.lock();
 }
 
-function restart() {
-  window.location.reload();
-}
+function restart() { window.location.reload(); }
 
 // --------------------------------------------------------------- event wiring
-assignHandlers();
-
 hud.el.startBtn.addEventListener('click', startGame);
 hud.el.resumeBtn.addEventListener('click', () => {
   hud.hideResume();
   player.controls.lock();
 });
 hud.el.clueClose.addEventListener('click', () => closeModal(() => hud.hideClue()));
-hud.el.riddleSubmit.addEventListener('click', submitRiddle);
-hud.el.riddleHint.addEventListener('click', showRiddleHint);
+hud.el.riddleSubmit.addEventListener('click', () => {
+  const p = PISTAS[state.currentPista];
+  submitRiddle(p, state.currentPista);
+});
+hud.el.riddleHint.addEventListener('click', () => showRiddleHint(PISTAS[state.currentPista]));
 hud.el.riddleClose.addEventListener('click', () => closeModal(() => hud.hideRiddle()));
 hud.el.riddleInput.addEventListener('keydown', (e) => {
-  if (e.code === 'Enter') submitRiddle();
+  if (e.code === 'Enter') submitRiddle(PISTAS[state.currentPista], state.currentPista);
 });
 hud.el.winRestart.addEventListener('click', restart);
 hud.el.gameoverRestart.addEventListener('click', restart);
 
-// Botón global de pista (contextual)
+// Botón global de pista (contextual a la pista activa)
 hud.el.hintBtn.addEventListener('click', () => {
   if (state.won || state.over) return;
-  if (!state.solved) {
-    if (!state.inscriptionRead) {
-      hud.toast('💡 Entrá a la cueva y leé la inscripción de la pared.');
-    } else {
-      hud.toast('💡 ' + PISTA_1.hints[0]);
-    }
+  const idx = state.currentPista;
+  const pista = PISTAS[idx];
+  if (state.solved[idx]) return;
+  if (!state.read[idx]) {
+    hud.toast('💡 Buscá la inscripción de ' + pista.place + ' y leela primero.');
+  } else {
+    hud.toast('💡 ' + pista.hints[0]);
   }
 });
 
 // Tecla E: interactuar con lo que esté en rango
 window.addEventListener('keydown', (e) => {
   if (e.code === 'KeyE' && state.active && !state.modalOpen && player.controls.isLocked) {
-    state.active.handler && state.active.handler();
+    handleInteract(state.active);
   }
 });
 
-// Al perder el lock sin modal abierto -> pausa
 player.controls.addEventListener('unlock', () => {
-  if (state.started && !state.modalOpen && !state.won && !state.over) {
-    hud.showResume();
-  }
+  if (state.started && !state.modalOpen && !state.won && !state.over) hud.showResume();
 });
 player.controls.addEventListener('lock', () => hud.hideResume());
 
@@ -191,7 +204,8 @@ function updateInteraction() {
   let best = null;
   let bestD = Infinity;
   for (const it of world.interactables) {
-    if (it.id === 'cofre' && state.solved) continue;
+    if (it.pistaIdx !== state.currentPista) continue; // solo la pista activa
+    if (it.kind === 'chest' && state.solved[it.pistaIdx]) continue;
     const d = Math.hypot(p.x - it.position.x, p.z - it.position.z);
     if (d < it.radius && d < bestD) { best = it; bestD = d; }
   }
@@ -200,11 +214,10 @@ function updateInteraction() {
   else hud.hidePrompt();
 }
 
-// Actualiza el último punto seguro (para respawnear tras un peligro)
+// Último punto seguro (para respawnear tras un peligro)
 function updateSafePos() {
   const p = player.object.position;
-  const h = terrainHeightAt(p.x, p.z);
-  if (h < 1.3) return;
+  if (terrainHeightAt(p.x, p.z) < 1.3) return;
   for (const tr of world.traps) {
     if (Math.hypot(p.x - tr.x, p.z - tr.z) < tr.r + 2) return;
   }
@@ -226,5 +239,11 @@ function animate() {
 }
 animate();
 
-// Exponer para debug/pruebas
-window.__isla = { state, world, player };
+// Debug/pruebas
+window.__isla = {
+  state, world, player, PISTAS,
+  interact: (id) => {
+    const it = world.interactables.find((i) => i.id === id);
+    if (it) handleInteract(it);
+  },
+};
