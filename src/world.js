@@ -115,6 +115,8 @@ export class World {
     this._scatterAnimals(); // animalitos que dan +1 vida si los cazás
     this._buildSeagulls(); // gaviotas volando
     this._buildClouds(); // nubes
+    this._buildButterflies(); // mariposas sobre el pasto
+    this._buildCrabs(); // cangrejos en la playa
 
     // Balizas: la de la cueva visible; las demás aparecen al resolver la anterior
     this._buildBeacon(0, CAVE, 0xffe08a, true);
@@ -147,6 +149,7 @@ export class World {
         }
       `,
     });
+    this._skyUniforms = mat.uniforms;
     this.add(new THREE.Mesh(geo, mat));
   }
 
@@ -162,7 +165,22 @@ export class World {
     sun.shadow.camera.bottom = -d;
     sun.shadow.camera.far = 400;
     this.add(sun);
-    this.add(new THREE.HemisphereLight(0xbfe0ee, 0x5a6a3a, 0.7));
+    const hemi = new THREE.HemisphereLight(0xbfe0ee, 0x5a6a3a, 0.7);
+    this.add(hemi);
+    this._sun = sun;
+
+    // Ciclo de día suave (mediodía ↔ tarde dorada), sin llegar a la noche.
+    const cSun = new THREE.Color();
+    this._animated.push((t) => {
+      const k = (Math.sin(t * (Math.PI * 2 / 210)) + 1) / 2; // 0..1 cada ~3.5 min
+      cSun.setHSL(0.13 - k * 0.05, 0.35 + k * 0.4, 0.78); // blanco -> dorado
+      sun.color.copy(cSun);
+      sun.intensity = 1.35 - k * 0.28;
+      hemi.intensity = 0.7 - k * 0.12;
+      if (this._skyUniforms) {
+        this._skyUniforms.bottom.value.setHSL(0.55 - k * 0.46, 0.5 + k * 0.2, 0.86 - k * 0.05);
+      }
+    });
   }
 
   // ------------------------------------------------------------------ terreno
@@ -192,14 +210,14 @@ export class World {
 
   // -------------------------------------------------------------------- agua
   _buildWater() {
-    const geo = new THREE.PlaneGeometry(1200, 1200, 80, 80);
+    const geo = new THREE.PlaneGeometry(1200, 1200, 110, 110);
     geo.rotateX(-Math.PI / 2);
     const mat = new THREE.MeshStandardMaterial({
       color: 0x1c6f97,
       transparent: true,
-      opacity: 0.82,
-      roughness: 0.25,
-      metalness: 0.15,
+      opacity: 0.84,
+      roughness: 0.12,
+      metalness: 0.35,
     });
     const water = new THREE.Mesh(geo, mat);
     water.position.y = WATER_LEVEL;
@@ -211,10 +229,25 @@ export class World {
       for (let i = 0; i < p.count; i++) {
         const x = base[i * 3];
         const z = base[i * 3 + 2];
-        p.setY(i, Math.sin(x * 0.08 + t * 1.3) * 0.25 + Math.cos(z * 0.06 + t) * 0.25);
+        p.setY(i,
+          Math.sin(x * 0.08 + t * 1.3) * 0.32 +
+          Math.cos(z * 0.06 + t) * 0.32 +
+          Math.sin((x + z) * 0.14 + t * 1.8) * 0.14);
       }
       p.needsUpdate = true;
+      geo.computeVertexNormals();
     });
+
+    // Espuma en la orilla (anillo blanco translúcido sobre la línea de costa)
+    const waterR = 118 * 0.815; // radio aprox. de la costa
+    const foam = new THREE.Mesh(
+      new THREE.RingGeometry(waterR - 3.5, waterR + 2, 96),
+      new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.4, side: THREE.DoubleSide })
+    );
+    foam.rotation.x = -Math.PI / 2;
+    foam.position.y = WATER_LEVEL + 0.12;
+    this.add(foam);
+    this._animated.push((t) => { foam.material.opacity = 0.3 + Math.sin(t * 1.5) * 0.15; });
   }
 
   // ---------------------------------------------------------------- naufragio
@@ -394,6 +427,80 @@ export class World {
       flame.scale.y = 0.85 + f * 0.3;
     });
 
+    // --- Detalles de la cueva ---
+    const crystalCols = [0x7ad0ff, 0xb98cff, 0x6fe3c2];
+    // Estalactitas del techo
+    for (let i = 0; i < 10; i++) {
+      const a = (i / 10) * Math.PI * 2;
+      const rr = 2 + (i % 3) * 1.8;
+      const sx = cx + Math.cos(a) * rr, sz = cz + Math.sin(a) * rr;
+      const len = 1.1 + (i % 3) * 0.9;
+      const st = new THREE.Mesh(new THREE.ConeGeometry(0.3, len, 6), darkRock);
+      st.position.set(sx, ground + 6.4 - len / 2, sz);
+      st.rotation.x = Math.PI;
+      this.add(st);
+    }
+    // Estalagmitas del piso
+    for (let i = 0; i < 5; i++) {
+      const a = i * 1.3 + 0.5, rr = 3 + (i % 2) * 2;
+      const sx = cx + Math.cos(a) * rr, sz = cz + Math.sin(a) * rr;
+      const len = 0.8 + (i % 3) * 0.7;
+      const sm = new THREE.Mesh(new THREE.ConeGeometry(0.36, len, 6), rock);
+      sm.position.set(sx, terrainHeightAt(sx, sz) + len / 2, sz);
+      sm.castShadow = true;
+      this.add(sm);
+    }
+    // Cristales brillantes que laten
+    const crystals = [];
+    for (let i = 0; i < 7; i++) {
+      const a = i * 1.1 + 1, rr = 4 + (i % 3);
+      const gx = cx + Math.cos(a) * rr, gz = cz + Math.sin(a) * rr;
+      const col = crystalCols[i % 3];
+      const cr = new THREE.Mesh(
+        new THREE.OctahedronGeometry(0.35 + (i % 3) * 0.15, 0),
+        new THREE.MeshStandardMaterial({ color: col, emissive: col, emissiveIntensity: 0.6, roughness: 0.25 })
+      );
+      cr.position.set(gx, terrainHeightAt(gx, gz) + 0.4, gz);
+      cr.rotation.set(i, i * 1.4, 0);
+      this.add(cr);
+      crystals.push(cr);
+    }
+    this._animated.push((t) => {
+      for (let i = 0; i < crystals.length; i++) crystals[i].material.emissiveIntensity = 0.4 + Math.sin(t * 2 + i) * 0.3;
+    });
+    // Segunda antorcha
+    const t2 = new THREE.Vector3(cx - 3, ground + 3, cz + 2);
+    const tl2 = new THREE.PointLight(0xffa64d, 2.4, 22, 2);
+    tl2.position.copy(t2); this.add(tl2);
+    const fl2 = new THREE.Mesh(new THREE.ConeGeometry(0.35, 1, 8), new THREE.MeshBasicMaterial({ color: 0xffb347 }));
+    fl2.position.copy(t2); this.add(fl2);
+    this._animated.push((t) => { const f = 0.8 + Math.sin(t * 15 + 2) * 0.2; tl2.intensity = 2.4 * f; fl2.scale.y = 0.85 + f * 0.3; });
+    // Restos de un explorador
+    const boneMat = new THREE.MeshStandardMaterial({ color: 0xdedbcf, roughness: 0.9 });
+    const skull = new THREE.Mesh(new THREE.SphereGeometry(0.35, 8, 7), boneMat);
+    skull.position.set(cx + 4.6, ground + 0.35, cz + 1); this.add(skull);
+    for (let i = 0; i < 3; i++) {
+      const bone = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 1, 5), boneMat);
+      bone.position.set(cx + 4.6 + (i - 1) * 0.4, ground + 0.15, cz + 1.7);
+      bone.rotation.set(0, i, Math.PI / 2); this.add(bone);
+    }
+    // Charco de agua
+    const puddle = new THREE.Mesh(
+      new THREE.CircleGeometry(1.6, 20),
+      new THREE.MeshStandardMaterial({ color: 0x24506a, roughness: 0.08, metalness: 0.5, transparent: true, opacity: 0.85 })
+    );
+    puddle.rotation.x = -Math.PI / 2;
+    puddle.position.set(cx - 1, ground + 0.06, cz + 3.6); this.add(puddle);
+    // Escombros
+    for (let i = 0; i < 7; i++) {
+      const a = i * 0.9, rr = 2.5 + (i % 4);
+      const rx = cx + Math.cos(a) * rr, rz = cz + Math.sin(a) * rr;
+      const s = 0.3 + (i % 3) * 0.25;
+      const rub = new THREE.Mesh(new THREE.DodecahedronGeometry(s, 0), rock);
+      rub.position.set(rx, terrainHeightAt(rx, rz) + s * 0.4, rz);
+      rub.rotation.set(i, i, i); this.add(rub);
+    }
+
     // Cofre de la Pista 1
     const chest = this._buildChest(cx, ground, cz + 2.5, 0);
 
@@ -517,6 +624,8 @@ export class World {
     });
     this.colliders.push({ x: sx, z: sz, r: 1.8 });
     this.colliders.push({ x: chest.position.x, z: chest.position.z, r: 1.6 });
+    // Detalle: obsidiana, calaveras y huesos alrededor del altar de lava
+    this._scatterProps(sx, sz, ['obsidian', 'skull', 'bone', 'obsidian'], 14, 3.5, 10, 3217);
   }
 
   // -------------------------------------------------------------- lago (P3)
@@ -612,6 +721,43 @@ export class World {
     });
     this.colliders.push({ x: tx, z: tz, r: 1.8 });
     this.colliders.push({ x: chx, z: chz, r: 1.6 });
+
+    // --- Detalle del lago ---
+    // Tronco caído en la orilla
+    const log = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.6, 5, 8), new THREE.MeshStandardMaterial({ color: 0x5a3d22, roughness: 1 }));
+    log.rotation.z = Math.PI / 2; log.rotation.y = 0.6;
+    const lgx = cx + LAKE_R - 1, lgz = cz + 4;
+    log.position.set(lgx, terrainHeightAt(lgx, lgz) + 0.5, lgz);
+    log.castShadow = true; this.add(log);
+    this.colliders.push({ x: lgx, z: lgz, r: 1.6 });
+    // Ranita sobre un nenúfar
+    const frog = new THREE.Group();
+    const fbody = new THREE.Mesh(new THREE.SphereGeometry(0.3, 8, 6), new THREE.MeshStandardMaterial({ color: 0x4f9b3a, roughness: 0.8 }));
+    fbody.scale.set(1, 0.7, 1.2); fbody.position.y = 0.2; frog.add(fbody);
+    for (const ex of [-0.12, 0.12]) {
+      const eye = new THREE.Mesh(new THREE.SphereGeometry(0.08, 6, 6), new THREE.MeshBasicMaterial({ color: 0xffe000 }));
+      eye.position.set(ex, 0.42, 0.18); frog.add(eye);
+    }
+    frog.position.set(cx + 2, ground + 0.16, cz - 1); this.add(frog);
+    // Luciérnagas que titilan sobre el agua
+    const flies = [];
+    for (let i = 0; i < 9; i++) {
+      const f = new THREE.Mesh(new THREE.SphereGeometry(0.09, 6, 6), new THREE.MeshBasicMaterial({ color: 0xd8ff70 }));
+      f.position.set(cx + (Math.sin(i * 2.1) * LAKE_R * 0.8), ground + 1.2 + (i % 3) * 0.6, cz + (Math.cos(i * 1.7) * LAKE_R * 0.8));
+      f.userData = { ox: f.position.x, oz: f.position.z, oy: f.position.y, ph: i };
+      this.add(f); flies.push(f);
+    }
+    this._animated.push((t) => {
+      for (const f of flies) {
+        f.position.x = f.userData.ox + Math.sin(t * 0.8 + f.userData.ph) * 1.4;
+        f.position.z = f.userData.oz + Math.cos(t * 0.7 + f.userData.ph) * 1.4;
+        f.position.y = f.userData.oy + Math.sin(t * 1.5 + f.userData.ph) * 0.4;
+        f.material.opacity = 0.4 + Math.abs(Math.sin(t * 3 + f.userData.ph)) * 0.6;
+        f.material.transparent = true;
+      }
+    });
+    // Hongos y piedras en la orilla
+    this._scatterProps(cx, cz, ['mushroom', 'rock', 'mushroom'], 10, LAKE_R + 1.5, LAKE_R + 7, 9911);
   }
 
   // ----------------------------------------------------------- dragón (P4)
@@ -768,6 +914,9 @@ export class World {
       position: chest.position.clone(), radius: 4,
       prompt: 'Presioná [E] para abrir el cofre',
     });
+
+    // Detalle: el botín del dragón desparramado (oro, huesos y calaveras)
+    this._scatterProps(cx, cz, ['gold', 'gold', 'bone', 'skull'], 22, 3.5, 10, 6543);
 
     // Animación: idle + aleteo + ciclo de fuego
     const CYCLE = 6;
@@ -1038,6 +1187,45 @@ export class World {
     return this._starGeoCache;
   }
 
+  // ------------------------------------------- props sueltos (detalle de escenas)
+  _prop(kind, x, y, z, rnd) {
+    if (kind === 'rock' || kind === 'obsidian') {
+      const s = 0.3 + rnd() * 0.6;
+      const mat = kind === 'obsidian'
+        ? new THREE.MeshStandardMaterial({ color: 0x2a2430, roughness: 0.4, metalness: 0.3 })
+        : new THREE.MeshStandardMaterial({ color: 0x7d766a, roughness: 1 });
+      const m = new THREE.Mesh(new THREE.DodecahedronGeometry(s, 0), mat);
+      m.position.set(x, y + s * 0.4, z); m.rotation.set(rnd() * 3, rnd() * 3, rnd() * 3);
+      m.castShadow = true; this.add(m);
+    } else if (kind === 'bone') {
+      const m = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.07, 0.8, 5), new THREE.MeshStandardMaterial({ color: 0xdedbcf, roughness: 0.9 }));
+      m.position.set(x, y + 0.1, z); m.rotation.set(rnd() * 3, rnd() * 3, Math.PI / 2); this.add(m);
+    } else if (kind === 'skull') {
+      const m = new THREE.Mesh(new THREE.SphereGeometry(0.3, 8, 7), new THREE.MeshStandardMaterial({ color: 0xdedbcf, roughness: 0.9 }));
+      m.position.set(x, y + 0.28, z); m.castShadow = true; this.add(m);
+    } else if (kind === 'gold') {
+      const m = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.24, 0.07, 12), new THREE.MeshStandardMaterial({ color: 0xf4c95d, metalness: 0.7, roughness: 0.3, emissive: 0x5a4300, emissiveIntensity: 0.3 }));
+      m.position.set(x, y + 0.05, z); m.rotation.set(Math.PI / 2, 0, rnd() * 3); this.add(m);
+    } else if (kind === 'mushroom') {
+      const g = new THREE.Group();
+      const stem = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.1, 0.35, 6), new THREE.MeshStandardMaterial({ color: 0xe8e0cf, roughness: 1 }));
+      stem.position.y = 0.18; g.add(stem);
+      const cap = new THREE.Mesh(new THREE.SphereGeometry(0.22, 8, 6, 0, Math.PI * 2, 0, Math.PI / 2), new THREE.MeshStandardMaterial({ color: rnd() < 0.5 ? 0xd83b34 : 0xe86ba8, roughness: 0.8 }));
+      cap.position.y = 0.35; g.add(cap);
+      g.position.set(x, y, z); this.add(g);
+    }
+  }
+
+  _scatterProps(cx, cz, list, count, rMin, rMax, seedN) {
+    let seed = seedN;
+    const rnd = () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647; };
+    for (let i = 0; i < count; i++) {
+      const a = rnd() * Math.PI * 2, rr = rMin + rnd() * (rMax - rMin);
+      const x = cx + Math.cos(a) * rr, z = cz + Math.sin(a) * rr;
+      this._prop(list[Math.floor(rnd() * list.length)], x, this.heightAt(x, z), z, rnd);
+    }
+  }
+
   // --------------------------------------------------------- gaviotas y nubes
   _buildSeagulls() {
     const wingMat = new THREE.MeshStandardMaterial({ color: 0xf4f4f0, roughness: 1, side: THREE.DoubleSide });
@@ -1067,6 +1255,78 @@ export class World {
         const flap = Math.sin(t * 5 + u.ph) * 0.5;
         u.wl.rotation.z = 0.35 + flap;
         u.wr.rotation.z = -0.35 - flap;
+      }
+    });
+  }
+
+  _buildButterflies() {
+    const cols = [0xf4c95d, 0xe86ba8, 0x7ad0ff, 0xff8a3a, 0xffffff, 0xb98cff];
+    let seed = 321;
+    const rnd = () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647; };
+    const flutter = [];
+    for (let i = 0; i < 10; i++) {
+      let x = 0, z = 0, h = -9, tries = 0;
+      while (tries++ < 20) {
+        const a = rnd() * Math.PI * 2, rr = 15 + rnd() * 85;
+        x = Math.cos(a) * rr; z = Math.sin(a) * rr; h = terrainHeightAt(x, z);
+        if (h > 1.5 && h < 8) break;
+      }
+      if (h <= 1.5) continue;
+      const g = new THREE.Group();
+      const mat = new THREE.MeshStandardMaterial({ color: cols[i % cols.length], roughness: 0.7, side: THREE.DoubleSide });
+      const wl = new THREE.Mesh(new THREE.CircleGeometry(0.22, 8), mat); wl.position.x = -0.12; g.add(wl);
+      const wr = new THREE.Mesh(new THREE.CircleGeometry(0.22, 8), mat); wr.position.x = 0.12; g.add(wr);
+      g.position.set(x, h + 1.6, z);
+      this.add(g);
+      flutter.push({ g, wl, wr, cx: x, cz: z, h, r: 2 + rnd() * 3, spd: 0.4 + rnd() * 0.5, ph: rnd() * 6 });
+    }
+    this._animated.push((t) => {
+      for (const b of flutter) {
+        const a = b.ph + t * b.spd;
+        b.g.position.set(b.cx + Math.cos(a) * b.r, b.h + 1.5 + Math.sin(t * 2 + b.ph) * 0.5, b.cz + Math.sin(a) * b.r);
+        b.g.rotation.y = -a + Math.PI / 2;
+        const fl = Math.sin(t * 12 + b.ph) * 1.1;
+        b.wl.rotation.y = fl; b.wr.rotation.y = -fl;
+      }
+    });
+  }
+
+  _buildCrabs() {
+    let seed = 8080;
+    const rnd = () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647; };
+    const crabs = [];
+    for (let i = 0; i < 6; i++) {
+      let x = 0, z = 0, h = -9, tries = 0;
+      while (tries++ < 30) {
+        const a = rnd() * Math.PI * 2, rr = 90 + rnd() * 18;
+        x = Math.cos(a) * rr; z = Math.sin(a) * rr; h = terrainHeightAt(x, z);
+        if (h > 0.1 && h < 1.8) break;
+      }
+      if (h <= 0.1 || h > 1.8) continue;
+      const g = new THREE.Group();
+      const red = new THREE.MeshStandardMaterial({ color: 0xd8433a, roughness: 0.7 });
+      const body = new THREE.Mesh(new THREE.SphereGeometry(0.32, 8, 6), red);
+      body.scale.set(1.3, 0.6, 1); body.position.y = 0.25; g.add(body);
+      for (const sx of [-0.4, 0.4]) {
+        const claw = new THREE.Mesh(new THREE.SphereGeometry(0.14, 6, 5), red);
+        claw.position.set(sx, 0.22, 0.3); g.add(claw);
+        for (const lz of [-0.2, 0, 0.2]) {
+          const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.3, 4), red);
+          leg.position.set(sx * 0.9, 0.1, lz); leg.rotation.z = sx > 0 ? -0.6 : 0.6; g.add(leg);
+        }
+        const eye = new THREE.Mesh(new THREE.SphereGeometry(0.05, 5, 5), new THREE.MeshBasicMaterial({ color: 0x111 }));
+        eye.position.set(sx * 0.3, 0.4, 0.28); g.add(eye);
+      }
+      g.position.set(x, h, z);
+      this.add(g);
+      crabs.push({ g, cx: x, cz: z, h, ph: rnd() * 6, r: 1.5 + rnd() * 1.5 });
+    }
+    this._animated.push((t) => {
+      for (const c of crabs) {
+        const s = Math.sin(t * 0.8 + c.ph);
+        c.g.position.x = c.cx + s * c.r;
+        c.g.position.z = c.cz + Math.cos(t * 0.5 + c.ph) * 0.6;
+        c.g.rotation.y = s > 0 ? 0.2 : -0.2; // se mueve de costado
       }
     });
   }

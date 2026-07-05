@@ -57,6 +57,18 @@ export class GameAudio {
     waves.connect(bp); bp.connect(wavesG); wavesG.connect(this.master);
     waves.start(); lfo.start();
 
+    // Viento entre los árboles (siseo agudo con ráfagas lentas)
+    const wind = this.ctx.createBufferSource();
+    wind.buffer = this._noise; wind.loop = true;
+    const hp = this.ctx.createBiquadFilter();
+    hp.type = 'bandpass'; hp.frequency.value = 2200; hp.Q.value = 0.5;
+    const windG = this.ctx.createGain(); windG.gain.value = 0.02;
+    const gust = this.ctx.createOscillator(); gust.frequency.value = 0.08;
+    const gustG = this.ctx.createGain(); gustG.gain.value = 0.02;
+    gust.connect(gustG); gustG.connect(windG.gain);
+    wind.connect(hp); hp.connect(windG); windG.connect(this.master);
+    wind.start(); gust.start();
+
     this._scheduleBird();
     this._scheduleGull();
   }
