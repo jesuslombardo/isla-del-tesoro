@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { World, SPAWN, CAVE, terrainHeightAt } from './world.js';
+import { World, SPAWN, CAVE, VOLCANO, LAKE, DRAGON, terrainHeightAt } from './world.js';
 import { Player } from './player.js';
 import { HUD } from './hud.js';
 import { TouchControls } from './touch.js';
@@ -158,6 +158,7 @@ function onDanger(msg) {
 function startGame() {
   state.started = true;
   hud.showHUD();
+  document.querySelectorAll('.hud-btn').forEach((b) => b.classList.remove('hidden'));
   hud.setLives(state.lives);
   hud.setObjective('Explorá la isla y encontrá la cueva (seguí el haz de luz).');
   hud.el.intro.classList.add('hidden');
@@ -198,6 +199,80 @@ soundBtn.addEventListener('click', () => {
   audio.setMuted(m);
   soundBtn.textContent = m ? '🔇' : '🔊';
 });
+
+// ---------------------------------------------------------------- celular
+const phoneEl = document.getElementById('phone');
+const phoneHome = document.getElementById('phone-home');
+const phoneApp = document.getElementById('phone-app');
+const phoneAppTitle = document.getElementById('phone-app-title');
+const phoneAppBody = document.getElementById('phone-app-body');
+
+function openPhone() {
+  if (!state.started || state.won || state.over) return;
+  showPhoneHome();
+  openModal(() => phoneEl.classList.remove('hidden'));
+}
+function showPhoneHome() { phoneApp.classList.add('hidden'); phoneHome.classList.remove('hidden'); }
+
+function showApp(name) {
+  phoneHome.classList.add('hidden');
+  phoneApp.classList.remove('hidden');
+  if (name === 'vidas') {
+    phoneAppTitle.textContent = '❤️ Vidas';
+    phoneAppBody.innerHTML =
+      `<div class="stat-big">${'❤️'.repeat(state.lives)}${'🖤'.repeat(Math.max(0, 3 - state.lives))}</div>` +
+      `<p>Te quedan <b>${state.lives}</b> de 3 vidas.</p>` +
+      `<p style="font-size:13px;margin-top:10px">Se pierden solo por peligros (mar, trampas, el fuego del dragón).</p>`;
+  } else if (name === 'plata') {
+    phoneAppTitle.textContent = '💎 Plata';
+    phoneAppBody.innerHTML =
+      `<div class="stat-big">💎 ${state.diamonds}</div><div class="stat-big">⭐ ${state.stars}</div>` +
+      `<p>Ganás <b>diamantes</b> y <b>estrellas</b> resolviendo pistas.</p>` +
+      `<p style="font-size:13px;margin-top:10px">Pronto vas a poder gastarlos en la tienda de personajes y fondos.</p>`;
+  } else if (name === 'mapa') {
+    phoneAppTitle.textContent = '🗺️ Mapa · Mundo 1';
+    phoneAppBody.innerHTML = buildMapSVG();
+  }
+}
+
+function buildMapSVG() {
+  const toX = (x) => 110 + x * 1.05;
+  const toY = (z) => 110 + z * 1.05;
+  const pts = [
+    { p: SPAWN, e: '🏴‍☠️', label: 'Barco (inicio)', idx: -1 },
+    { p: CAVE, e: '🕳️', label: 'Cueva', idx: 0 },
+    { p: VOLCANO, e: '🌋', label: 'Volcán', idx: 1 },
+    { p: LAKE, e: '🌊', label: 'Lago', idx: 2 },
+    { p: DRAGON, e: '🐉', label: 'Dragón', idx: 3 },
+  ];
+  let markers = '';
+  let legend = '';
+  for (const m of pts) {
+    const x = toX(m.p.x);
+    const y = toY(m.p.z);
+    const done = m.idx >= 0 && state.solved[m.idx];
+    const current = m.idx === state.currentPista;
+    const ring = done ? '#2e7d32' : current ? '#e8a91b' : '#ffffff';
+    markers += `<circle cx="${x}" cy="${y}" r="11" fill="rgba(255,255,255,.92)" stroke="${ring}" stroke-width="3"/>`;
+    markers += `<text x="${x}" y="${y + 5}" font-size="13" text-anchor="middle">${m.e}</text>`;
+    if (done) markers += `<text x="${x + 9}" y="${y - 6}" font-size="11" text-anchor="middle">✅</text>`;
+    if (m.idx >= 0) legend += `<div>${m.e} ${m.label} ${done ? '✅' : current ? '⟵ estás acá' : ''}</div>`;
+    else legend += `<div>${m.e} ${m.label}</div>`;
+  }
+  return `<svg class="map-svg" viewBox="0 0 220 220" xmlns="http://www.w3.org/2000/svg">
+    <rect width="220" height="220" rx="12" fill="#2e7fb5"/>
+    <ellipse cx="110" cy="110" rx="98" ry="96" fill="#e8dcab"/>
+    <ellipse cx="110" cy="110" rx="82" ry="80" fill="#6da34d"/>
+    ${markers}
+  </svg><div class="map-legend">${legend}</div>`;
+}
+
+document.getElementById('phone-btn').addEventListener('click', openPhone);
+document.getElementById('phone-exit').addEventListener('click', () => closeModal(() => phoneEl.classList.add('hidden')));
+document.getElementById('phone-back').addEventListener('click', showPhoneHome);
+for (const btn of document.querySelectorAll('.app')) {
+  btn.addEventListener('click', () => showApp(btn.dataset.app));
+}
 hud.el.clueClose.addEventListener('click', () => closeModal(() => hud.hideClue()));
 hud.el.riddleSubmit.addEventListener('click', () => {
   const p = PISTAS[state.currentPista];

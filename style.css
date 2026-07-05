@@ -92,7 +92,7 @@ html, body {
 #prompt kbd { background: var(--gold); color: var(--ink); }
 
 #hint-btn {
-  position: fixed; bottom: 22px; right: 22px; pointer-events: auto;
+  position: fixed; bottom: 22px; right: 22px; pointer-events: auto; z-index: 6;
   background: var(--gold); color: var(--ink);
   border: none; border-radius: 999px; padding: 10px 18px;
   font-size: 15px; font-weight: bold; cursor: pointer;
@@ -101,13 +101,63 @@ html, body {
 #hint-btn:hover { background: var(--gold-dark); }
 
 #sound-btn {
-  position: fixed; top: 14px; right: 16px; pointer-events: auto;
+  position: fixed; top: 14px; right: 16px; pointer-events: auto; z-index: 6;
   background: rgba(20, 30, 40, .72); color: #fff;
   border: 1px solid rgba(244, 201, 93, .5); border-radius: 50%;
   width: 44px; height: 44px; font-size: 20px; cursor: pointer;
   box-shadow: 0 4px 12px rgba(0,0,0,.4);
 }
 #sound-btn:hover { background: rgba(40, 55, 70, .85); }
+
+#phone-btn {
+  position: fixed; top: 66px; right: 16px; pointer-events: auto; z-index: 6;
+  background: rgba(20, 30, 40, .72); color: #fff;
+  border: 1px solid rgba(244, 201, 93, .5); border-radius: 50%;
+  width: 44px; height: 44px; font-size: 20px; cursor: pointer;
+  box-shadow: 0 4px 12px rgba(0,0,0,.4);
+}
+#phone-btn:hover { background: rgba(40, 55, 70, .85); }
+
+/* ---------- Celular ---------- */
+.phone-frame {
+  width: 320px; max-width: 88vw; height: 620px; max-height: 88vh;
+  background: #14181d; border-radius: 40px; padding: 14px;
+  border: 3px solid #2a3038; box-shadow: 0 20px 60px rgba(0,0,0,.7);
+  position: relative;
+}
+.phone-notch {
+  position: absolute; top: 20px; left: 50%; transform: translateX(-50%);
+  width: 120px; height: 22px; background: #14181d; border-radius: 0 0 14px 14px; z-index: 2;
+}
+.phone-screen {
+  width: 100%; height: 100%; border-radius: 28px; overflow: hidden;
+  background: linear-gradient(160deg, #2e7fb5, #57c1e8 55%, #eddaa8);
+  position: relative; color: #12212b;
+}
+#phone-home, #phone-app { position: absolute; inset: 0; display: flex; flex-direction: column; padding: 44px 18px 18px; }
+.phone-top { text-align: center; font-weight: bold; color: #fff; text-shadow: 0 1px 3px rgba(0,0,0,.4); margin-bottom: 18px; }
+.app-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.app {
+  background: rgba(255,255,255,.85); border: none; border-radius: 20px;
+  padding: 16px 8px; font-size: 15px; font-weight: bold; color: #12212b;
+  display: flex; flex-direction: column; align-items: center; gap: 6px; cursor: pointer;
+  box-shadow: 0 4px 10px rgba(0,0,0,.25);
+}
+.app:active { transform: scale(.95); }
+.app .ico { font-size: 34px; }
+.phone-nav {
+  margin-top: auto; align-self: center;
+  background: rgba(0,0,0,.35); color: #fff; border: none; border-radius: 999px;
+  padding: 10px 20px; font-size: 15px; font-weight: bold; cursor: pointer;
+}
+.phone-app-title { text-align: center; font-size: 20px; font-weight: bold; color: #fff; margin: 6px 0 14px; }
+.phone-app-body {
+  flex: 1; background: rgba(255,255,255,.9); border-radius: 18px; padding: 16px;
+  overflow: auto; text-align: center;
+}
+.stat-big { font-size: 30px; margin: 10px 0; }
+.map-svg { width: 100%; height: auto; display: block; }
+.map-legend { font-size: 13px; text-align: left; margin-top: 10px; line-height: 1.7; }
 
 kbd {
   display: inline-block; background: #eee; color: #222;

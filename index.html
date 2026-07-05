@@ -29,8 +29,34 @@
     <div id="objective"><span class="tag">Objetivo</span><span id="objective-text"></span></div>
     <div id="crosshair">+</div>
     <div id="prompt" class="hidden"></div>
-    <button id="hint-btn" title="Pedir una pista">💡 Pista</button>
-    <button id="sound-btn" title="Silenciar / activar sonido">🔊</button>
+  </div>
+
+  <!-- Botones interactivos del HUD (fuera del contenedor pointer-events:none) -->
+  <button id="hint-btn" class="hud-btn hidden" title="Pedir una pista">💡 Pista</button>
+  <button id="sound-btn" class="hud-btn hidden" title="Silenciar / activar sonido">🔊</button>
+  <button id="phone-btn" class="hud-btn hidden" title="Abrir el celular">📱</button>
+
+  <!-- Celular / inventario -->
+  <div id="phone" class="overlay hidden">
+    <div class="phone-frame">
+      <div class="phone-notch"></div>
+      <div class="phone-screen">
+        <div id="phone-home">
+          <div class="phone-top">La Isla del Tesoro 🏝️</div>
+          <div class="app-grid">
+            <button class="app" data-app="mapa"><span class="ico">🗺️</span>Mapa</button>
+            <button class="app" data-app="vidas"><span class="ico">❤️</span>Vidas</button>
+            <button class="app" data-app="plata"><span class="ico">💎</span>Plata</button>
+          </div>
+          <button id="phone-exit" class="phone-nav">✕ Salir del celu</button>
+        </div>
+        <div id="phone-app" class="hidden">
+          <button id="phone-back" class="phone-nav">← Volver</button>
+          <div id="phone-app-title" class="phone-app-title"></div>
+          <div id="phone-app-body" class="phone-app-body"></div>
+        </div>
+      </div>
+    </div>
   </div>
 
   <!-- Intro / story overlay -->
