@@ -112,6 +112,7 @@ export class World {
     this._buildMountainPortal(); // montaña + portal al Mundo 2 (se activa al pasar la P4)
     this._scatterVegetation();
     this._scatterCollectibles(); // monedas y estrellas para juntar
+    this._scatterAnimals(); // animalitos que dan +1 vida si los cazás
 
     // Balizas: la de la cueva visible; las demás aparecen al resolver la anterior
     this._buildBeacon(0, CAVE, 0xffe08a, true);
@@ -982,6 +983,54 @@ export class World {
     s.closePath();
     this._starGeoCache = new THREE.ShapeGeometry(s);
     return this._starGeoCache;
+  }
+
+  // --------------------------------------------- animalitos (dan +1 vida al cazar)
+  _scatterAnimals() {
+    this.animals = [];
+    let seed = 555;
+    const rnd = () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647; };
+    let placed = 0, tries = 0;
+    while (placed < 6 && tries < 200) {
+      tries++;
+      const ang = rnd() * Math.PI * 2;
+      const rad = 16 + rnd() * 66;
+      const x = Math.cos(ang) * rad, z = Math.sin(ang) * rad;
+      const h = terrainHeightAt(x, z);
+      if (h < 1.6 || h > 8) continue;
+      if (Math.hypot(x - VOLCANO.x, z - VOLCANO.z) < 22) continue;
+      if (Math.hypot(x - DRAGON.x, z - DRAGON.z) < 14) continue;
+      if (Math.hypot(x - SPAWN.x, z - SPAWN.z) < 12) continue;
+      this._buildAnimal(x, z, rnd);
+      placed++;
+    }
+  }
+
+  _buildAnimal(x, z, rnd) {
+    const g = new THREE.Group();
+    const furColor = [0xd8c8a8, 0xb89060, 0xe8e0d0, 0x9a7a54][Math.floor(rnd() * 4)];
+    const fur = new THREE.MeshStandardMaterial({ color: furColor, roughness: 1 });
+    const body = new THREE.Mesh(new THREE.SphereGeometry(0.5, 10, 8), fur);
+    body.scale.set(1, 0.8, 1.3); body.position.y = 0.5;
+    g.add(body);
+    const head = new THREE.Mesh(new THREE.SphereGeometry(0.33, 10, 8), fur);
+    head.position.set(0, 0.72, 0.55);
+    g.add(head);
+    for (const sx of [-0.13, 0.13]) {
+      const ear = new THREE.Mesh(new THREE.ConeGeometry(0.1, 0.55, 5), fur);
+      ear.position.set(sx, 1.1, 0.5); ear.rotation.x = -0.2;
+      g.add(ear);
+      const eye = new THREE.Mesh(new THREE.SphereGeometry(0.05, 6, 6), new THREE.MeshBasicMaterial({ color: 0x1a1a1a }));
+      eye.position.set(sx, 0.75, 0.83);
+      g.add(eye);
+    }
+    const tail = new THREE.Mesh(new THREE.SphereGeometry(0.16, 8, 6), new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 1 }));
+    tail.position.set(0, 0.5, -0.72);
+    g.add(tail);
+    g.traverse((o) => { o.castShadow = true; });
+    g.position.set(x, terrainHeightAt(x, z), z);
+    this.add(g);
+    this.animals.push({ group: g, x, z, alive: true, dir: rnd() * Math.PI * 2, wt: rnd() * 6, hop: 0 });
   }
 
   // --------------------------------------------------------- marcadores UI 3D

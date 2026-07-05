@@ -56,6 +56,7 @@ const state = {
   world: 1, // 1 = isla, 2 = bosque
 };
 const worldOf = (pista) => (pista.num <= 4 ? 1 : 2);
+const MAX_LIVES = 5; // se pueden ganar vidas cazando animalitos, hasta este tope
 let hintIdx = 0; // índice de pista/hint mostrada en el acertijo actual
 
 // ---------------------------------------------------------------- interacción
@@ -267,8 +268,8 @@ function showApp(name) {
     phoneAppTitle.textContent = '❤️ Vidas';
     phoneAppBody.innerHTML =
       `<div class="stat-big">${'❤️'.repeat(state.lives)}${'🖤'.repeat(Math.max(0, 3 - state.lives))}</div>` +
-      `<p>Te quedan <b>${state.lives}</b> de 3 vidas.</p>` +
-      `<p style="font-size:13px;margin-top:10px">Se pierden solo por peligros (mar, trampas, el fuego del dragón).</p>`;
+      `<p>Te quedan <b>${state.lives}</b> de ${MAX_LIVES} vidas.</p>` +
+      `<p style="font-size:13px;margin-top:10px">Se pierden por peligros (mar, trampas, dragón, esqueleto). ¡Cazá animalitos 🐰 en la isla para ganar vidas!</p>`;
   } else if (name === 'plata') {
     phoneAppTitle.textContent = '💎 Plata';
     phoneAppBody.innerHTML =
@@ -282,32 +283,34 @@ function showApp(name) {
 }
 
 function buildMapSVG2() {
-  const toX = (x) => 110 + x * 1.1;
-  const toY = (z) => 115 + z * 0.78;
-  const pts = [
-    { x: 0, z: -28, e: '⛏️', label: 'Mina / carrito', idx: 4 },
-    { x: 40, z: 4, e: '🌴', label: 'Palmera', idx: 5 },
-    { x: -40, z: 2, e: '🏚️', label: 'Casa embrujada', idx: 6 },
-    { x: 0, z: 50, e: '🏰', label: 'Castillo', idx: 7 },
-    { x: 0, z: 84, e: '💎', label: 'Tesoro', idx: 8 },
+  // Mapa estilizado: una MONTAÑA con las paradas subiendo hasta el tesoro en la cima.
+  const stops = [
+    { x: 58, y: 176, e: '⛏️', label: 'Mina / carrito', idx: 4 },
+    { x: 150, y: 166, e: '🌴', label: 'Palmera', idx: 5 },
+    { x: 72, y: 128, e: '🏚️', label: 'Casa embrujada', idx: 6 },
+    { x: 142, y: 98, e: '🏰', label: 'Castillo', idx: 7 },
+    { x: 110, y: 60, e: '💎', label: 'Tesoro', idx: 8 },
   ];
-  let pines = '';
-  const seedPts = [[35, 50], [180, 60], [60, 175], [175, 175], [150, 40], [40, 130]];
-  for (const [px, py] of seedPts) pines += `<text x="${px}" y="${py}" font-size="16" text-anchor="middle">🌲</text>`;
+  const path = 'M ' + stops.map((s) => `${s.x} ${s.y}`).join(' L ');
   let markers = '', legend = '';
-  for (const m of pts) {
-    const x = toX(m.x), y = toY(m.z);
-    const done = state.solved[m.idx];
-    const cur = state.currentPista === m.idx;
+  for (const s of stops) {
+    const done = state.solved[s.idx];
+    const cur = state.currentPista === s.idx;
     const ring = done ? '#2e7d32' : cur ? '#e8a91b' : '#ffffff';
-    markers += `<circle cx="${x}" cy="${y}" r="11" fill="rgba(255,255,255,.92)" stroke="${ring}" stroke-width="3"/>`;
-    markers += `<text x="${x}" y="${y + 5}" font-size="13" text-anchor="middle">${m.e}</text>`;
-    if (done) markers += `<text x="${x + 9}" y="${y - 6}" font-size="11" text-anchor="middle">✅</text>`;
-    legend += `<div>${m.e} ${m.label} ${done ? '✅' : cur ? '⟵ estás acá' : ''}</div>`;
+    markers += `<circle cx="${s.x}" cy="${s.y}" r="12" fill="rgba(255,255,255,.94)" stroke="${ring}" stroke-width="3"/>`;
+    markers += `<text x="${s.x}" y="${s.y + 5}" font-size="14" text-anchor="middle">${s.e}</text>`;
+    if (done) markers += `<text x="${s.x + 10}" y="${s.y - 7}" font-size="11" text-anchor="middle">✅</text>`;
+    legend += `<div>${s.e} ${s.label} ${done ? '✅' : cur ? '⟵ estás acá' : ''}</div>`;
   }
   return `<svg class="map-svg" viewBox="0 0 220 220" xmlns="http://www.w3.org/2000/svg">
-    <rect width="220" height="220" rx="12" fill="#24352b"/>
-    ${pines}${markers}
+    <rect width="220" height="220" rx="12" fill="#3a4a63"/>
+    <polygon points="6,208 110,40 214,208" fill="#6d7360"/>
+    <polygon points="110,40 214,208 128,208" fill="#5b614f"/>
+    <polygon points="88,96 110,40 132,96" fill="#eef4f0"/>
+    <text x="26" y="200" font-size="15">🌲</text>
+    <text x="192" y="200" font-size="15">🌲</text>
+    <path d="${path}" fill="none" stroke="#ffffff" stroke-width="2" stroke-dasharray="3 4" opacity=".75"/>
+    ${markers}
   </svg><div class="map-legend">${legend}</div>`;
 }
 
@@ -437,6 +440,50 @@ function checkCollectibles() {
   }
 }
 
+// Animalitos: huyen del jugador; si los alcanzás (los cazás), +1 vida.
+function updateAnimals(dt) {
+  if (!world.animals) return;
+  const p = player.object.position;
+  for (const a of world.animals) {
+    if (!a.alive) continue;
+    const dx = a.x - p.x, dz = a.z - p.z;
+    const d = Math.hypot(dx, dz);
+    if (d < 1.5) {
+      a.alive = false;
+      a.group.visible = false;
+      audio.coin(true);
+      if (state.lives < MAX_LIVES) {
+        state.lives++;
+        hud.setLives(state.lives);
+        hud.toast('🐰 ¡Lo atrapaste! +1 vida ❤️', 1600);
+      } else {
+        hud.toast('🐰 ¡Atrapado! (ya tenés todas las vidas)', 1600);
+      }
+      continue;
+    }
+    let nx = a.x, nz = a.z;
+    if (d < 9) {
+      // huye en dirección contraria al jugador
+      const s = 8.6 * dt;
+      nx = a.x + (dx / d) * s;
+      nz = a.z + (dz / d) * s;
+    } else {
+      // deambula tranquilo
+      a.wt += dt;
+      const s = 1.8 * dt;
+      const dir = a.dir + Math.sin(a.wt * 0.6) * 0.6;
+      nx = a.x + Math.cos(dir) * s;
+      nz = a.z + Math.sin(dir) * s;
+    }
+    // se queda en tierra firme y dentro de la isla
+    if (world.heightAt(nx, nz) > 0.6 && Math.hypot(nx, nz) < 92) { a.x = nx; a.z = nz; }
+    a.hop += dt * 11;
+    const bob = Math.abs(Math.sin(a.hop)) * (d < 9 ? 0.28 : 0.1);
+    a.group.position.set(a.x, world.heightAt(a.x, a.z) + bob, a.z);
+    a.group.rotation.y = Math.atan2(a.x - p.x, a.z - p.z); // mira en la dirección de huida
+  }
+}
+
 // El esqueleto del castillo persigue al jugador mientras la Pista 8 está activa.
 function updateSkeleton(dt) {
   const sk = world.skeleton;
@@ -485,6 +532,7 @@ function animate() {
     player.update(dt, { onDanger });
     updateSafePos();
     checkCollectibles();
+    updateAnimals(dt);
     updateSkeleton(dt);
     // Pasos: un sonido cada cierta distancia recorrida
     const p = player.object.position;
@@ -509,5 +557,6 @@ window.__isla = {
     if (it) handleInteract(it);
   },
   checkCollectibles,
+  updateAnimals,
   enterMundo2,
 };
